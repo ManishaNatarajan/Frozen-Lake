@@ -59,10 +59,9 @@ def encode_full_state(map_id, states):
     return all_state_info
 
 
-def extract_episode_data(filename):
+def extract_episode_data(filename, map_ids=(5, 6, 7, 8)):
     df = pd.read_csv(filename)
-    # For now: Extract only select maps
-    map_ids = [5, 6, 7, 8]
+    # For now: Extract only select maps --> map_ids
     episode_data = []
     for id in map_ids:
         map_data = df.loc[df['map'] == id]

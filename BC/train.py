@@ -29,6 +29,9 @@ def train(device, train_dataloader, test_dataloader,
     # Create directories for saving models and tensorboard logs
     if not os.path.isdir(os.path.join(log_dir, 'models')):
         os.makedirs(os.path.join(log_dir, 'models'))
+
+    # TODO: Dump training configs
+
     summary_dir = os.path.join(log_dir, str(time))
     writer = SummaryWriter(log_dir=summary_dir)
 
@@ -100,6 +103,8 @@ def train(device, train_dataloader, test_dataloader,
                     best_test_loss = batch_test_loss
                     print(f"Saving Best Model... {batch_test_loss / num_batches_test}")
                     torch.save(model.state_dict(), os.path.join(log_dir, "best.pth"))
+
+            torch.save(model.state_dict(), os.path.join(log_dir, f"models/{epoch}.pth"))
 
             model.train()  # Switch back to train mode after eval
 
