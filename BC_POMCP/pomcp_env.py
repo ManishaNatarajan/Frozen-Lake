@@ -21,9 +21,12 @@ Reward:
 from typing import List, Optional
 import random
 import numpy as np
-
+import torch
+import os
 from gym import spaces, utils
 from frozenlake_map import MAPS, FOG, HUMAN_ERR, ROBOT_ERR
+
+from BC.model import BCModel
 
 LEFT = 0
 DOWN = 1
@@ -222,7 +225,8 @@ class FrozenLakeEnv:
             c=15,
             gamma=0.99,
             seed=None,
-            human_type="random"
+            human_type="random",
+            model_folder_path="BC_logs/20230712-1343/"
     ):
         random.seed(seed)
         np.random.seed(seed)
@@ -245,18 +249,21 @@ class FrozenLakeEnv:
         self.robot_action = None
         self.last_interrupt = [None, None]
 
-        # Position of holes (currently fully accessible to human and robot)
-        self.hole = []
-        for row in range(self.ncol):
-            for col in range(self.ncol):
-                if self.desc[row, col] in b'H':
-                    self.hole.append((row, col))
+        # Pre-load the map as an 8x8x2 grid (only keep changing the agent positions when passing through the model...)
+        self.map_state = np.zeros((2, 8, 8))
 
-        self.slippery = []
-        for row in range(self.ncol):
-            for col in range(self.ncol):
-                if self.desc[row, col] in b'S':
-                    self.slippery.append((row, col))
+        # Position of holes (currently fully accessible to human and robot)
+        rows, cols = np.where(self.desc == b'H')
+        self.hole = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[0, rows, cols] = 2  # set Hole
+
+        rows, cols = np.where(self.desc == b'S')
+        self.slippery = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[0, rows, cols] = 1  # set Slippery regions
+
+        rows, cols = np.where(self.desc == b'F')
+        self.fog = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[1, rows, cols] = 1  # set fog
 
         self.score = 0
 
@@ -298,6 +305,14 @@ class FrozenLakeEnv:
             min(64 * ncol, 512) // self.ncol,
             min(64 * nrow, 512) // self.nrow,
         )
+
+        # Load pre-trained BC Model
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=5,
+                             conv_hidden=32, action_hidden=32, num_layers=1, use_actions=True)
+
+        self.model = self.model.to(self.device)
+        self.model.load_state_dict(torch.load(os.path.join(model_folder_path, "best.pth")))
 
     def to_s(self, row, col):
         return row * self.ncol + col
@@ -359,15 +374,15 @@ class FrozenLakeEnv:
         last_row = last_position // self.ncol
         last_col = last_position % self.ncol
         if self.desc[last_row, last_col] in b'HS' and curr_position == 0:
-            return 0 # The game was restarted, not sure what to return
+            return 0  # The game was restarted, not sure what to return
         if curr_row == last_row:
             if curr_col == last_col + 1:
-                return 2 # Right
+                return 2  # Right
             else:
-                return 0 # Left
+                return 0  # Left
         else:
             if curr_row == last_row + 1:
-                return 1 # Down
+                return 1  # Down
             else:
                 return 3
 
@@ -415,7 +430,7 @@ class FrozenLakeEnv:
             human_accept = human_action[0]
             human_detect = human_action[1]
             human_direction = human_action[2]
-            if human_detect: # Use detection function
+            if human_detect:  # Use detection function
                 s = position
                 next_human_slippery = {i for i in human_slippery}
                 next_robot_slippery = {i for i in robot_slippery}
@@ -439,7 +454,9 @@ class FrozenLakeEnv:
 
             else:  # No detection -> Move
                 s = self.move(position, human_direction)
-                next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery, robot_slippery, human_err, robot_err, detecting=True)
+                next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery,
+                                                                                       robot_slippery, human_err,
+                                                                                       robot_err, detecting=True)
                 next_position_history = position_history + [s]
                 next_position_history.pop(0)
             return next_position_history, next_human_slippery, next_robot_slippery, human_err, robot_err
@@ -476,7 +493,9 @@ class FrozenLakeEnv:
                     next_position_history = position_history + [0]
                     next_position_history.pop(0)
                     return next_position_history, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
-                next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery, robot_slippery, human_err, robot_err)
+                next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery,
+                                                                                       robot_slippery, human_err,
+                                                                                       robot_err)
                 next_position_history = position_history + [s]
                 next_position_history.pop(0)
                 return next_position_history, next_human_slippery, next_robot_slippery, human_err, robot_err
@@ -531,7 +550,7 @@ class FrozenLakeEnv:
                 # No assistance
                 # human_choice = np.random.choice(4)
                 accept = 0
-                if human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
+                if human_acceptance_probability <= prob < 0.5 + 0.5 * human_acceptance_probability:
                     detect = 1
             elif robot_assist_type == 1:  # or robot_action_type == 3: #Interrupt
                 # print(self.env.lastaction)
@@ -594,7 +613,7 @@ class FrozenLakeEnv:
                 # No assistance
                 # human_choice = np.random.choice(4)
                 accept = 0
-                if human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
+                if human_acceptance_probability <= prob < 0.5 + 0.5 * human_acceptance_probability:
                     detect = 1
             elif robot_assist_type == 1:  # or robot_action_type == 3: #Interrupt
                 # print(self.env.lastaction)
@@ -680,7 +699,7 @@ class FrozenLakeEnv:
 
         return accept, detect, human_choice
 
-    def reward(self, augmented_state, robot_action, human_action = None):
+    def reward(self, augmented_state, robot_action, human_action=None):
         position_history, human_slippery, robot_slippery = augmented_state[:3]
         position, last_position = position_history[-1], position_history[-2]
         # Get reward based on the optimality of the human action and the turn number
@@ -707,7 +726,6 @@ class FrozenLakeEnv:
 
     def get_human_action(self, robot_action=None):
         raise NotImplementedError
-
 
     def get_robot_action(self, world_state, robot_assistance_mode=0):
         # Robot's recommended action with or without explanations
@@ -775,7 +793,9 @@ class FrozenLakeEnv:
         s = 0
         self.visited_slippery_region = []
         self.score = 0
-        next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole}, {i for i in (self.hole+self.slippery)}, (), ())
+        next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole},
+                                                                               {i for i in (self.hole + self.slippery)},
+                                                                               (), ())
         self.world_state = [[0, 0, 0, 0], next_human_slippery, next_robot_slippery, set(), set()]
 
         return [[0, 0, 0, 0], next_human_slippery, next_robot_slippery, set(), set()]
@@ -807,8 +827,8 @@ class FrozenLakeEnv:
     #     # print("\n")
     #     print("\n".join("".join(line) for line in desc))
 
-        # with closing(outfile):
-        #     return outfile.getvalue()
+    # with closing(outfile):
+    #     return outfile.getvalue()
 
 
 if __name__ == '__main__':

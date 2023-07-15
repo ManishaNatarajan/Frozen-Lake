@@ -4,6 +4,7 @@
 
 import os
 import sys
+
 sys.path.append("C:/Users/mnatarajan30/Documents/LAB/codes/frozen_lake_baselines/")
 
 from BC_POMCP.pomcp_env import *
@@ -71,11 +72,14 @@ class Driver:
             print("Node belief is empty!!!")
             return
         # Update the belief (i.e., all particles) in the current node to match the current world state
-        if (human_action_node.belief[0][0] != env.world_state[0]) and (human_action_node.belief[0][1] != env.world_state[1]) and \
-                (human_action_node.belief[0][2] != env.world_state[2]) and (human_action_node.belief[0][3] != env.world_state[3]) and \
+        if (human_action_node.belief[0][0] != env.world_state[0]) and (
+                human_action_node.belief[0][1] != env.world_state[1]) and \
+                (human_action_node.belief[0][2] != env.world_state[2]) and (
+                human_action_node.belief[0][3] != env.world_state[3]) and \
                 (human_action_node.belief[0][4] != env.world_state[4]):
             human_action_node.belief = [[env.world_state[0], env.world_state[1], env.world_state[2], env.world_state[3],
-                                         env.world_state[4], belief[6], belief[7]] for belief in human_action_node.belief]
+                                         env.world_state[4], belief[6], belief[7]] for belief in
+                                        human_action_node.belief]
 
     def updateBeliefChiH(self, human_action_node, human_action):
         """
@@ -115,11 +119,13 @@ class Driver:
         :param current_node:
         :return:
         """
-        initial_world_state = [x for x in self.env.world_state]  #TODO: Ensure you reset the env. with the correct answer for the next round.
+        initial_world_state = [x for x in
+                               self.env.world_state]  # TODO: Ensure you reset the env. with the correct answer for the next round.
         root_node.belief = []
         num_samples = 10000
         # Sample belief_trust and belief_capability from a distribution
-        sampled_beliefs = random.sample(current_node.belief, num_samples) if len(current_node.belief) > num_samples else current_node.belief
+        sampled_beliefs = random.sample(current_node.belief, num_samples) if len(
+            current_node.belief) > num_samples else current_node.belief
         root_node.belief.extend([[initial_world_state[0], initial_world_state[1], initial_world_state[2],
                                   initial_world_state[3], initial_world_state[4], current_node_belief[5],
                                   current_node_belief[6]] for current_node_belief in sampled_beliefs])
@@ -132,13 +138,16 @@ class Driver:
           :return: expected robot capability calibration score, human capability calibration score
         """
         num_samples = 10000
-        sampled_beliefs = random.sample(human_action_node.belief, num_samples) if len(human_action_node.belief ) > num_samples else human_action_node.belief
+        sampled_beliefs = random.sample(human_action_node.belief, num_samples) if len(
+            human_action_node.belief) > num_samples else human_action_node.belief
 
         total_robot_capability_score = 0
         total_human_capability_score = 0
         for belief in sampled_beliefs:
-            total_robot_capability_score += self.env.robotCapabilityCalibrationScore(belief)  # TODO: Need to implement this in env --> Not using this for now
-            total_human_capability_score += self.env.humanCapabilityCalibrationScore(belief)  # TODO: Need to implement this in env --> Not using this for now
+            total_robot_capability_score += self.env.robotCapabilityCalibrationScore(
+                belief)  # TODO: Need to implement this in env --> Not using this for now
+            total_human_capability_score += self.env.humanCapabilityCalibrationScore(
+                belief)  # TODO: Need to implement this in env --> Not using this for now
 
         return total_robot_capability_score / len(sampled_beliefs), total_human_capability_score / len(sampled_beliefs)
 
@@ -169,7 +178,7 @@ class Driver:
         final_env_reward = 0
 
         # Initial human action
-        robot_action = (0, None) # No interruption
+        robot_action = (0, None)  # No interruption
         init_human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
         # init_human_action = (0, 2)
         print("Human Initial Action: ", init_human_action)
@@ -218,7 +227,7 @@ class Driver:
             # if ans == "Y":
             #     human_action = tuple([int(i) for i in input("Enter human action separated by comma: ").split(',')])
             # print("Human Action: ", human_action)
-            human_action_node = robot_action_node.human_node_children[human_action[1]*4 + human_action[2]]
+            human_action_node = robot_action_node.human_node_children[human_action[1] * 4 + human_action[2]]
 
             final_env_reward += env.reward(env.world_state, robot_action, human_action)
             # print("Reward:", env.reward(env.world_state, robot_action, human_action))
@@ -230,7 +239,8 @@ class Driver:
 
             if human_action_node == "empty":
                 # Here we are adding to the tree as this will become the root for the search in the next turn
-                human_action_node = robot_action_node.human_node_children[human_action[1] * 4 + human_action[2]] = HumanActionNode(env)
+                human_action_node = robot_action_node.human_node_children[
+                    human_action[1] * 4 + human_action[2]] = HumanActionNode(env)
                 # This is where we call invigorate belief... When we add a new human action node to the tree
                 self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
 
@@ -290,7 +300,7 @@ class Driver:
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [0, 5, 21]:  #[0, 5, 21, 25, 42]
+    for SEED in [0, 5, 21]:  # [0, 5, 21, 25, 42]
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
@@ -311,7 +321,7 @@ if __name__ == '__main__':
 
         # factors for POMCP
         gamma = 0.99  # gamma for terminating rollout based on depth in MCTS
-        c = 10 #400  # exploration constant for UCT (taken as R_high - R_low)
+        c = 10  # 400  # exploration constant for UCT (taken as R_high - R_low)
         e = 0.1  # For epsilon-greedy policy
         epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
         num_iter = 500
@@ -342,8 +352,9 @@ if __name__ == '__main__':
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n], true_human_capability=true_capability,
-                               true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
+                                true_human_capability=true_capability,
+                                true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type="epsilon_greedy")
 
             # Reset the environment to initialize everything correctly
@@ -352,10 +363,11 @@ if __name__ == '__main__':
 
             # TODO: Initialize belief: Currently only using the 4 combinations
             for i in range(len(all_initial_belief_trust)):
-                    initial_belief.append([init_world_state[0], init_world_state[1], init_world_state[2], init_world_state[3],
-                                           init_world_state[4],
-                                           list(all_initial_belief_trust[i]),
-                                           true_capability])
+                initial_belief.append(
+                    [init_world_state[0], init_world_state[1], init_world_state[2], init_world_state[3],
+                     init_world_state[4],
+                     list(all_initial_belief_trust[i]),
+                     true_capability])
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
@@ -379,7 +391,8 @@ if __name__ == '__main__':
 
             print("===================================================================================================")
             print("===================================================================================================")
-            print("Average environmental reward after {} rounds:{}".format(num_rounds, total_env_reward / float(num_rounds)))
+            print("Average environmental reward after {} rounds:{}".format(num_rounds,
+                                                                           total_env_reward / float(num_rounds)))
             print("Num Particles: ", len(driver.solver.root_action_node.belief))
             all_rewards.append(rewards)
             mean_rewards.append(np.mean(rewards))
