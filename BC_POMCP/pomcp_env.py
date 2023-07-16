@@ -526,12 +526,70 @@ class FrozenLakeEnv:
                 next_position_history = [p for p in position_history]
                 return next_position_history, human_slippery, robot_slippery, human_err, robot_err
 
+    def get_BC_observation(self, current_augmented_state, robot_action):
+        current_world_state = current_augmented_state[:3]
+        current_human_trust = current_augmented_state[5]
+        current_human_capability = current_augmented_state[6]
+
+        position_history = current_world_state[0]
+        current_position = current_world_state[0][-1]
+        last_position = current_world_state[0][-2]
+
+        # Get human action from BC model
+        robot_assist_type = robot_action[0]
+        robot_direction = robot_action[1]
+        human_slippery = current_augmented_state[1]
+        robot_slippery = current_augmented_state[2]
+
+        full_BC_state = []
+        action_history = []
+
+        # Convert to BC input
+        for k in range(len(position_history)):
+            agent_pos = position_history[0]
+            row = agent_pos // 8
+            col = agent_pos % 8
+            temp_state = np.zeros((1, 8, 8))
+            temp_state[0, row, col] = 1
+            temp_state = np.concatenate([temp_state, self.map_state], axis=0)
+            full_BC_state.append(temp_state)
+
+            # Dummy action history
+            temp_action_history = np.zeros((10,))
+            action_history.append(temp_action_history)
+
+        # stack them to create a tensor
+        past_obs = torch.from_numpy(np.array(full_BC_state)).to(self.device).unsqueeze(0).float()
+        action_history = torch.from_numpy(np.array(action_history)).to(self.device).unsqueeze(0).float()
+
+        model_prediction = self.model.get_predictions([past_obs, action_history])
+        # Get human action in the form of (accept, direction, detect)
+        human_action_idx = torch.argmax(model_prediction, axis=-1)
+        accept, detect, direction = 0, 0, 0
+
+        if human_action_idx == 4:
+            # Human used the detect function
+            detect = 1
+            direction = np.random.randint(0, 4)  # Randomly choose the detection direction for now
+            accept = 0 if robot_assist_type == 0 else 2
+
+        else:
+            # Human did not use the detection function
+            direction = human_action_idx
+
+            if robot_assist_type == 1 or robot_assist_type == 2:
+                undo_action = robot_direction - 2 if robot_direction - 2 >= 0 else robot_direction + 2
+                accept = 2 if direction == undo_action else 1  # Human actively opposes the robot's choice
+            else:
+                accept = 0  # No-assist
+        return accept, detect, direction
+
     def get_rollout_observation(self, current_augmented_state, robot_action):
         current_world_state = current_augmented_state[:3]
         current_human_trust = current_augmented_state[5]
         current_human_capability = current_augmented_state[6]
-        current_position = current_world_state[0][0]
-        last_position = current_world_state[0][1]
+        current_position = current_world_state[0][-1]
+        last_position = current_world_state[0][-2]
         # Get human action from heuristic_interrupt model (Needs access to game state info)
         robot_assist_type = robot_action[0]
         robot_direction = robot_action[1]
