@@ -41,14 +41,20 @@ class SimulatedHuman:
         :rtype: lists representing one hot vector of intended and actual human actions
         """
         # TODO: Currently human behavior is fixed, i.e., trust in the agent and capability are not updated.
-        position_history, human_slippery, robot_slippery, human_err, robot_err = world_state
-        current_position, last_position = position_history[-1], position_history[-2]
+        human_slippery = world_state[len(world_state) - 4]
+        robot_slippery = world_state[len(world_state) - 3]
+        human_err, robot_err = world_state[-2], world_state[-1]
+        current_position, last_position = world_state[0], world_state[1]
 
         robot_assist_type = robot_action[0]
         robot_direction = robot_action[1]
         true_human_trust = self.true_human_trust
         true_human_capability = self.true_human_capability
         human_acceptance_probability = (np.array(true_human_trust) / np.sum(true_human_trust))[0]
+
+        # For actions with explanation, increase the human acceptance probability
+        if robot_assist_type in [3, 4]:
+            human_acceptance_probability = np.minimum(human_acceptance_probability + 0.1, 1.0)
 
         # Human's action decision is defined by:
         # - the underlying task difficulty
@@ -66,7 +72,7 @@ class SimulatedHuman:
                 # No assistance
                 # human_choice = np.random.choice(4)
                 accept = 0
-            elif robot_assist_type == 1:  # or robot_action_type == 3: #Interrupt
+            elif robot_assist_type == 1 or robot_assist_type == 3:  # Interrupt
                 # print(self.env.lastaction)
                 # User either chooses the robot's suggestion or their own based on their trust in the robot and their capablity
                 if robot_direction - 2 >= 0:
@@ -131,7 +137,7 @@ class SimulatedHuman:
                 accept = 0
                 if human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
                     detect = 1
-            elif robot_assist_type == 1: #or robot_action_type == 3: #Interrupt
+            elif robot_assist_type == 1 or robot_assist_type == 3: #Interrupt
                 # print(self.env.lastaction)
                 # User either chooses the robot's suggestion or their own based on their trust in the robot and their capablity
                 if robot_direction - 2 >= 0:
