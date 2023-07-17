@@ -44,7 +44,7 @@ class SimulatedHuman:
         human_slippery = world_state[len(world_state) - 4]
         robot_slippery = world_state[len(world_state) - 3]
         human_err, robot_err = world_state[-2], world_state[-1]
-        current_position, last_position = world_state[0][0], world_state[0][1]
+        current_position, last_position = world_state[0][-1], world_state[0][-2]
 
         robot_assist_type = robot_action[0]
         robot_direction = robot_action[1]

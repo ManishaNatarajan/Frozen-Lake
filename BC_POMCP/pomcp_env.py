@@ -411,21 +411,21 @@ class FrozenLakeEnv:
         return next_augmented_state
 
     def world_state_transition(self, current_world_state, robot_action, human_action):
-        position = current_world_state[0][0]
+        position = current_world_state[0][-1]
 
         if human_action:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, None, human_action)
-            next_world_state = [[next_position, position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
+            next_world_state = [[position, next_position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         else:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, robot_action, None)
-            next_world_state = [[next_position, position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
+            next_world_state = [[position, next_position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         return next_world_state
 
     def step(self, current_world_state, robot_action, human_action):
         human_slippery = current_world_state[self.num_states - 4]
         robot_slippery = current_world_state[self.num_states - 3]
         human_err, robot_err = current_world_state[-2], current_world_state[-1]
-        position, last_position = current_world_state[0][0], current_world_state[0][1]
+        position, last_position = current_world_state[0][-1], current_world_state[0][-2]
         if human_action != None:
             human_accept = human_action[0]
             human_detect = human_action[1]
@@ -519,8 +519,8 @@ class FrozenLakeEnv:
         current_world_state = current_augmented_state[:self.num_states]
         current_human_trust = current_augmented_state[self.num_states]
         current_human_capability = current_augmented_state[self.num_states+1]
-        current_position = current_world_state[0][0]
-        last_position = current_world_state[0][1]
+        current_position = current_world_state[0][-1]
+        last_position = current_world_state[0][-2]
         # Get human action from heuristic_interrupt model (Needs access to game state info)
         robot_assist_type, robot_direction = robot_action
         human_slippery = current_augmented_state[self.num_states-4]
@@ -694,7 +694,7 @@ class FrozenLakeEnv:
 
     def reward(self, augmented_state, robot_action, human_action = None):
         human_slippery, robot_slippery = augmented_state[self.num_states-4], augmented_state[self.num_states-3]
-        position, last_position = augmented_state[0][0], augmented_state[0][1]
+        position, last_position = augmented_state[0][-1], augmented_state[0][-2]
         # Get reward based on the optimality of the human action and the turn number
         # TODO: add penalty if robot takes control etc.
         curr_col = position // self.ncol
@@ -724,7 +724,7 @@ class FrozenLakeEnv:
         # Robot's recommended action with or without explanations
         # For the purpose of data collection, the robot will follow static_take_control policies
 
-        position, last_position = world_state[0][0], world_state[0][1]
+        position, last_position = world_state[0][-1], world_state[0][-2]
         robot_slippery = world_state[self.num_states-3]
 
         curr_row = position // self.ncol
@@ -797,7 +797,7 @@ class FrozenLakeEnv:
         self.world_state = [[0, 0], next_human_slippery, next_robot_slippery, set(), set()]
         self.num_states = len(self.world_state)
 
-        return [[self.s, 0], next_human_slippery, next_robot_slippery, set(), set()]
+        return [[0, self.s], next_human_slippery, next_robot_slippery, set(), set()]
 
     def isTerminal(self, world_state):
         """
@@ -805,7 +805,7 @@ class FrozenLakeEnv:
         :param world_state:
         :return: returns true if world_state is terminal
         """
-        position = world_state[0][0]
+        position = world_state[0][-1]
         curr_col = position // self.ncol
         curr_row = position % self.ncol
         if self.desc[curr_col, curr_row] in b'G':
@@ -867,7 +867,7 @@ if __name__ == '__main__':
         reward = env.reward(curr_augmented_state, curr_human_action)
         print("State: {}".format((curr_augmented_state[0])))
         print("Reward: {}".format(reward))
-        position = curr_augmented_state[0][0]
+        position = curr_augmented_state[0][-1]
         curr_col = position // env.ncol
         curr_row = position % env.ncol
         if env.desc[curr_col, curr_row] in b'H':
