@@ -272,6 +272,7 @@ class FrozenLakeEnv:
         self.true_human_trust = true_human_trust  # at the start of the study
         self.true_human_capability = true_robot_capability  # fixed - parameter (assume known??) at the start of the study
         self.world_state = []
+        self.num_states = len(self.world_state)
         # Action space: 'no_interrupt': 0,
         #     'interrupt': 1,
         #     'control': 2,
@@ -382,11 +383,11 @@ class FrozenLakeEnv:
 
     def augmented_state_transition(self, current_augmented_state, robot_action, human_action):
         # observed states
-        current_world_state = current_augmented_state[:len(self.world_state)]
+        current_world_state = current_augmented_state[:self.num_states]
 
         # Latent states
-        human_trust = current_augmented_state[len(self.world_state)]
-        human_capability = current_augmented_state[len(self.world_state)+1]
+        human_trust = current_augmented_state[self.num_states]
+        human_capability = current_augmented_state[self.num_states+1]
 
         # World state (observable) (human's)
         next_world_state = self.world_state_transition(current_world_state, robot_action, human_action)
@@ -410,21 +411,21 @@ class FrozenLakeEnv:
         return next_augmented_state
 
     def world_state_transition(self, current_world_state, robot_action, human_action):
-        position = current_world_state[0]
+        position = current_world_state[0][0]
 
         if human_action:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, None, human_action)
-            next_world_state = [next_position, position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
+            next_world_state = [[next_position, position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         else:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, robot_action, None)
-            next_world_state = [next_position, position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
+            next_world_state = [[next_position, position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         return next_world_state
 
     def step(self, current_world_state, robot_action, human_action):
-        human_slippery = current_world_state[len(self.world_state) - 4]
-        robot_slippery = current_world_state[len(self.world_state) - 3]
+        human_slippery = current_world_state[self.num_states - 4]
+        robot_slippery = current_world_state[self.num_states - 3]
         human_err, robot_err = current_world_state[-2], current_world_state[-1]
-        position, last_position = current_world_state[0], current_world_state[1]
+        position, last_position = current_world_state[0][0], current_world_state[0][1]
         if human_action != None:
             human_accept = human_action[0]
             human_detect = human_action[1]
@@ -515,15 +516,15 @@ class FrozenLakeEnv:
                 return position, human_slippery, robot_slippery, human_err, robot_err
 
     def get_rollout_observation(self, current_augmented_state, robot_action):
-        current_world_state = current_augmented_state[:len(self.world_state)]
-        current_human_trust = current_augmented_state[len(self.world_state)]
-        current_human_capability = current_augmented_state[len(self.world_state)+1]
-        current_position = current_world_state[0]
-        last_position = current_world_state[1]
+        current_world_state = current_augmented_state[:self.num_states]
+        current_human_trust = current_augmented_state[self.num_states]
+        current_human_capability = current_augmented_state[self.num_states+1]
+        current_position = current_world_state[0][0]
+        last_position = current_world_state[0][1]
         # Get human action from heuristic_interrupt model (Needs access to game state info)
         robot_assist_type, robot_direction = robot_action
-        human_slippery = current_augmented_state[len(self.world_state)-4]
-        robot_slippery = current_augmented_state[len(self.world_state)-3]
+        human_slippery = current_augmented_state[self.num_states-4]
+        robot_slippery = current_augmented_state[self.num_states-3]
         # When the robot is assisting -> human choice depends on trust
         human_acceptance_probability = (np.array(current_human_trust) / np.sum(current_human_trust))[0]
 
@@ -692,8 +693,8 @@ class FrozenLakeEnv:
         return accept, detect, human_choice
 
     def reward(self, augmented_state, robot_action, human_action = None):
-        human_slippery, robot_slippery = augmented_state[len(self.world_state)-4], augmented_state[len(self.world_state)-3]
-        position, last_position = augmented_state[0], augmented_state[1]
+        human_slippery, robot_slippery = augmented_state[self.num_states-4], augmented_state[self.num_states-3]
+        position, last_position = augmented_state[0][0], augmented_state[0][1]
         # Get reward based on the optimality of the human action and the turn number
         # TODO: add penalty if robot takes control etc.
         curr_col = position // self.ncol
@@ -719,13 +720,12 @@ class FrozenLakeEnv:
     def get_human_action(self, robot_action=None):
         raise NotImplementedError
 
-
     def get_robot_action(self, world_state, robot_assistance_mode=0):
         # Robot's recommended action with or without explanations
         # For the purpose of data collection, the robot will follow static_take_control policies
 
-        position, last_position = world_state[0], world_state[1]
-        robot_slippery = world_state[len(world_state)-3]
+        position, last_position = world_state[0][0], world_state[0][1]
+        robot_slippery = world_state[self.num_states-3]
 
         curr_row = position // self.ncol
         curr_col = position % self.ncol
@@ -794,9 +794,10 @@ class FrozenLakeEnv:
         self.visited_slippery_region = []
         self.score = 0
         next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole}, {i for i in (self.hole+self.slippery)}, (), ())
-        self.world_state = [0, 0, next_human_slippery, next_robot_slippery, set(), set()]
+        self.world_state = [[0, 0], next_human_slippery, next_robot_slippery, set(), set()]
+        self.num_states = len(self.world_state)
 
-        return [self.s, 0, next_human_slippery, next_robot_slippery, set(), set()]
+        return [[self.s, 0], next_human_slippery, next_robot_slippery, set(), set()]
 
     def isTerminal(self, world_state):
         """
@@ -804,7 +805,7 @@ class FrozenLakeEnv:
         :param world_state:
         :return: returns true if world_state is terminal
         """
-        position = world_state[0]
+        position = world_state[0][0]
         curr_col = position // self.ncol
         curr_row = position % self.ncol
         if self.desc[curr_col, curr_row] in b'G':
@@ -866,7 +867,7 @@ if __name__ == '__main__':
         reward = env.reward(curr_augmented_state, curr_human_action)
         print("State: {}".format((curr_augmented_state[0])))
         print("Reward: {}".format(reward))
-        position = curr_augmented_state[0]
+        position = curr_augmented_state[0][0]
         curr_col = position // env.ncol
         curr_row = position % env.ncol
         if env.desc[curr_col, curr_row] in b'H':
