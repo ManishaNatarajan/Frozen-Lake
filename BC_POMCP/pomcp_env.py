@@ -22,10 +22,13 @@ from typing import List, Optional
 import random
 import gym
 import numpy as np
+import torch
+import os
 import copy
 
 from gym import spaces, utils
 from frozenlake_map import MAPS, FOG, HUMAN_ERR, ROBOT_ERR
+from BC.model import BCModel
 
 LEFT = 0
 DOWN = 1
@@ -224,7 +227,8 @@ class FrozenLakeEnv:
             c=15,
             gamma=0.99,
             seed=None,
-            human_type="random"
+            human_type="random",
+            model_folder_path="BC_logs/20230712-1343"
     ):
         random.seed(seed)
         np.random.seed(seed)
@@ -234,9 +238,8 @@ class FrozenLakeEnv:
         if desc is None:
             desc = MAPS[map_name]
         self.desc = desc = np.asarray(desc, dtype="c")
-        self.fog = foggy = np.asarray(foggy, dtype="c")
-        # self.robot_map = copy.deepcopy(desc)
-        # self.human_map = copy.deepcopy(desc)
+        self._fog = np.asarray(foggy, dtype="c")
+
         self.nrow, self.ncol = nrow, ncol = desc.shape
         self.human_err = human_err
         self.robot_err = robot_err
@@ -245,18 +248,24 @@ class FrozenLakeEnv:
         self.initial_state_distrib = np.array(desc == b"B").astype("float64").ravel()
         self.initial_state_distrib /= self.initial_state_distrib.sum()
 
-        # self.robot_map[self.robot_map == b'S'] = b'F'  # Assume robot has access to the ground truth map for now
-        # self.human_map[self.human_map == b'S'] = b'F'
-
         self.robot_action = None
         self.last_interrupt = [None, None]
+
+        # Preload the map state for BC model (only keep changing the agent positions as you pass through the model...)
+        self.map_state = np.zeros((2, 8, 8))
 
         # Position of holes (currently fully accessible to human and robot)
         rows, cols = np.where(self.desc == b'H')
         self.hole = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[0, rows, cols] = 2  # set hole
 
         rows, cols = np.where(self.desc == b'S')
         self.slippery = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[0, rows, cols] = 1  # set slippery regions
+
+        rows, cols = np.where(self._fog == b'F')
+        self.fog_map = [(r, c) for r, c in zip(rows, cols)]
+        self.map_state[1, rows, cols] = 1  # set fog
 
         self.score = 0
 
@@ -301,6 +310,14 @@ class FrozenLakeEnv:
             min(64 * ncol, 512) // self.ncol,
             min(64 * nrow, 512) // self.nrow,
         )
+
+        # Load pre-trained BC Model
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=5,
+                             conv_hidden=32, action_hidden=32, num_layers=1, use_actions=True)
+
+        self.model = self.model.to(self.device)
+        self.model.load_state_dict(torch.load(os.path.join(model_folder_path, "best.pth")))
 
     def to_s(self, row, col):
         return row * self.ncol + col
@@ -411,14 +428,15 @@ class FrozenLakeEnv:
         return next_augmented_state
 
     def world_state_transition(self, current_world_state, robot_action, human_action):
-        position = current_world_state[0][-1]
+        position_history = current_world_state[0]
 
         if human_action:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, None, human_action)
-            next_world_state = [[position, next_position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         else:
             next_position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err = self.step(current_world_state, robot_action, None)
-            next_world_state = [[position, next_position], next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
+
+        next_position_history = position_history[1:] + [next_position]
+        next_world_state = [next_position_history, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err]
         return next_world_state
 
     def step(self, current_world_state, robot_action, human_action):
@@ -514,6 +532,61 @@ class FrozenLakeEnv:
                     return 0, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
                 self.s = position
                 return position, human_slippery, robot_slippery, human_err, robot_err
+
+    def get_BC_observation(self, current_augmented_state, robot_action):
+        current_human_trust = current_augmented_state[self.num_states]
+        current_human_capability = current_augmented_state[self.num_states+1]
+
+        position_history = current_augmented_state[0]
+
+        # Get human action from BC model
+        robot_assist_type = robot_action[0]
+        robot_direction = robot_action[1]
+        human_slippery = current_augmented_state[self.num_states-4]
+        robot_slippery = current_augmented_state[self.num_states-3]
+
+        full_BC_state = []
+        action_history = []
+
+        # Convert to BC input
+        for k in range(len(position_history)):
+            agent_pos = position_history[k]
+            row = agent_pos // self.ncol
+            col = agent_pos % self.ncol
+            temp_state = np.zeros((1, 8, 8))
+            temp_state[0, row, col] = 1
+            temp_state = np.concatenate([temp_state, self.map_state], axis=0)
+            full_BC_state.append(temp_state)
+
+            # Dummy action history
+            temp_action_history = np.zeros((10,))
+            action_history.append(temp_action_history)
+
+        # stack them to create a tensor
+        past_obs = torch.from_numpy(np.array(full_BC_state)).to(self.device).unsqueeze(0).float()
+        action_history = torch.from_numpy(np.array(action_history)).to(self.device).unsqueeze(0).float()
+
+        model_prediction = self.model.get_predictions([past_obs, action_history])
+        # Get human action in the form of (accept, direction, detect)
+        human_action_idx = torch.argmax(model_prediction, axis=-1)
+        accept, detect, direction = 0, 0, 0
+
+        if human_action_idx == 4:
+            # Human used the detect function
+            detect = 1
+            direction = np.random.randint(0, 4)  # Randomly choose the detection direction for now
+            accept = 0 if robot_assist_type == 0 else 2
+
+        else:
+            # Human did not use the detection function
+            direction = human_action_idx
+
+            if robot_assist_type == 1 or robot_assist_type == 2:
+                undo_action = robot_direction - 2 if robot_direction - 2 >= 0 else robot_direction + 2
+                accept = 2 if direction == undo_action else 1  # Human actively opposes the robot's choice
+            else:
+                accept = 0  # No-assist
+        return accept, detect, direction
 
     def get_rollout_observation(self, current_augmented_state, robot_action):
         current_world_state = current_augmented_state[:self.num_states]
@@ -794,10 +867,10 @@ class FrozenLakeEnv:
         self.visited_slippery_region = []
         self.score = 0
         next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole}, {i for i in (self.hole+self.slippery)}, (), ())
-        self.world_state = [[0, 0], next_human_slippery, next_robot_slippery, set(), set()]
+        self.world_state = [[0, 0, 0, 0], next_human_slippery, next_robot_slippery, set(), set()]
         self.num_states = len(self.world_state)
 
-        return [[0, self.s], next_human_slippery, next_robot_slippery, set(), set()]
+        return [[0, 0, 0, self.s], next_human_slippery, next_robot_slippery, set(), set()]
 
     def isTerminal(self, world_state):
         """

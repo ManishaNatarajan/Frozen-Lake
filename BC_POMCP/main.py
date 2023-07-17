@@ -312,7 +312,7 @@ if __name__ == '__main__':
         c = 10 #400  # exploration constant for UCT (taken as R_high - R_low)
         e = 0.1  # For epsilon-greedy policy
         epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-        num_iter = 500
+        num_iter = 100
         num_steps = max_steps
         initial_belief = []
 
@@ -361,7 +361,7 @@ if __name__ == '__main__':
             driver = Driver(env, solver, num_steps, simulated_human)
 
             # Executes num_rounds of search (calibration)
-            num_rounds = 10
+            num_rounds = 5
             total_env_reward = 0
 
             rewards = []
@@ -387,5 +387,5 @@ if __name__ == '__main__':
         print("===================================================================================================")
 
         all_rewards = np.array(all_rewards)
-        with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
+        with open("logs/pomcp_BC/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
             np.save(f, all_rewards)
