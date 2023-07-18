@@ -287,7 +287,7 @@ class FrozenLakeEnv:
         #     'control': 2,
         #     'interrupt+explain': 3,
         #     'control+explain': 4
-        self.robot_action_space = spaces.MultiDiscrete([3, 4], seed=seed)
+        self.robot_action_space = spaces.MultiDiscrete([5, 4], seed=seed)
         # Human's action space is whether they accepted the robot's suggestion and the option that they choose
         self.human_action_space = spaces.MultiDiscrete([3, 2, 4], seed=seed)  # (no-assist/accept/reject, detect/no-detect, LEFT/DOWN/RIGHT/UP)
         # Robot's observation space (for now is the human's last action)
@@ -534,8 +534,8 @@ class FrozenLakeEnv:
                 return position, human_slippery, robot_slippery, human_err, robot_err
 
     def get_BC_observation(self, current_augmented_state, robot_action):
-        current_human_trust = current_augmented_state[self.num_states]
-        current_human_capability = current_augmented_state[self.num_states+1]
+        # current_human_trust = current_augmented_state[self.num_states]
+        # current_human_capability = current_augmented_state[self.num_states+1]
 
         position_history = current_augmented_state[0]
 

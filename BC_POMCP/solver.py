@@ -44,8 +44,8 @@ class POMCPSolver:
         :param depth: (type: int) the current depth in the tree
         :return: (type: float) returns rollout value
         """
-        # human_action = self.env.get_rollout_observation(augmented_state, robot_action)
-        human_action = self.env.get_BC_observation(augmented_state, robot_action)
+        human_action = self.env.get_rollout_observation(augmented_state, robot_action)
+        # human_action = self.env.get_BC_observation(augmented_state, robot_action)
         # human_action = (0, 1)
         # value = self.env.reward(augmented_state, robot_action) + self.env.gamma * self.rollout_helper(copy.deepcopy(augmented_state), robot_action, human_action, depth)
         value = self.rollout_helper(
@@ -100,8 +100,8 @@ class POMCPSolver:
             return self.env.final_reward(next_augmented_state)
 
         # next_human_action = self.env.get_rollout_observation(augmented_state, next_robot_action) #next or augmented_state?
-        # next_human_action = self.env.get_rollout_observation(next_augmented_state, next_robot_action)
-        next_human_action = self.env.get_BC_observation(next_augmented_state, next_robot_action)
+        next_human_action = self.env.get_rollout_observation(next_augmented_state, next_robot_action)
+        # next_human_action = self.env.get_BC_observation(next_augmented_state, next_robot_action)
 
         # Recursive rollout
         return self.env.reward(next_augmented_state, next_robot_action, next_human_action) + self.env.gamma * self.rollout_helper(next_augmented_state,
@@ -156,8 +156,8 @@ class POMCPSolver:
 
         # Simulate human action
         # human_action = self.env.get_observation(augmented_state, robot_action_node, True) # TODO: Check this and see how this is different from get_rollout_observation
-        # human_action = self.env.get_rollout_observation(second_augmented_state, robot_action)
-        human_action = self.env.get_BC_observation(second_augmented_state, robot_action)
+        human_action = self.env.get_rollout_observation(second_augmented_state, robot_action)
+        # human_action = self.env.get_BC_observation(second_augmented_state, robot_action)
         next_augmented_state = self.env.augmented_state_transition(second_augmented_state, robot_action, human_action)
 
         next_action_node = robot_action_node.human_node_children[human_action[1]*4 + human_action[2]]

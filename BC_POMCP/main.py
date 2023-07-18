@@ -209,11 +209,10 @@ class Driver:
 
             # Note here that it is not the augmented state
             # (the latent parameters are already defined in the SimulatedHuman model I think)
-            human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-            # ans = input("Change human action {}? Y/N: ".format(human_action))
-            # if ans == "Y":
-            #     human_action = tuple([int(i) for i in input("Enter human action separated by comma: ").split(',')])
-            # print("Human Action: ", human_action)
+            # human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
+            human_action = list(env.get_BC_observation(env.world_state, robot_action))  # Get human action from the BC model
+            # human_action[-1] = int(human_action[-1].detach().cpu().numpy())  # Convert model prediction from tensor to int
+
             human_action_node = robot_action_node.human_node_children[human_action[1]*4 + human_action[2]]
 
             final_env_reward += env.reward(env.world_state, robot_action, human_action)
@@ -288,7 +287,7 @@ class Driver:
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [0]:  #[0, 5, 21, 25, 42]
+    for SEED in [5]:  #[0, 5, 21, 25, 42]
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
@@ -312,7 +311,7 @@ if __name__ == '__main__':
         c = 10 #400  # exploration constant for UCT (taken as R_high - R_low)
         e = 0.1  # For epsilon-greedy policy
         epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-        num_iter = 100
+        num_iter = 500
         num_steps = max_steps
         initial_belief = []
 
@@ -341,7 +340,7 @@ if __name__ == '__main__':
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
                                 is_slippery=False, render_mode="human", true_human_trust=true_trust[n], true_human_capability=true_capability,
-                               true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
+                                true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type="epsilon_greedy")
 
             # Reset the environment to initialize everything correctly
@@ -371,6 +370,10 @@ if __name__ == '__main__':
                 env_reward = driver.execute(i, debug_tree=False)
                 rewards.append(env_reward)
                 total_env_reward += env_reward
+
+                # reset root node belief to be initial belief
+                # root_node = RootNode(env, initial_belief)
+                # driver.solver.root_action_node = root_node
 
             print("===================================================================================================")
             print("===================================================================================================")
