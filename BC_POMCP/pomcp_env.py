@@ -20,14 +20,13 @@ Reward:
 """
 from typing import List, Optional
 import random
-import gym
+
 import numpy as np
 import torch
 import os
-import copy
 
 from gym import spaces, utils
-from frozenlake_map import MAPS, FOG, HUMAN_ERR, ROBOT_ERR
+from data_loaders.frozenlake_map import MAPS, FOG, HUMAN_ERR, ROBOT_ERR
 from BC.model import BCModel
 
 LEFT = 0
@@ -287,7 +286,7 @@ class FrozenLakeEnv:
         #     'control': 2,
         #     'interrupt+explain': 3,
         #     'control+explain': 4
-        self.robot_action_space = spaces.MultiDiscrete([5, 4], seed=seed)
+        self.robot_action_space = spaces.MultiDiscrete([3, 4], seed=seed)
         # Human's action space is whether they accepted the robot's suggestion and the option that they choose
         self.human_action_space = spaces.MultiDiscrete([3, 2, 4], seed=seed)  # (no-assist/accept/reject, detect/no-detect, LEFT/DOWN/RIGHT/UP)
         # Robot's observation space (for now is the human's last action)
@@ -784,6 +783,7 @@ class FrozenLakeEnv:
             reward = -10
         elif self.desc[curr_col, curr_row] in b'G':
             reward = 30
+            print("*******************************GOAL*******************************************")
         return reward
 
     def final_reward(self, augmented_state):

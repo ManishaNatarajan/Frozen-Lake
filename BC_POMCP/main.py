@@ -293,7 +293,7 @@ if __name__ == '__main__':
         os.environ['PYTHONHASHSEED'] = str(SEED)
 
         # Initialize constants for setting up the environment
-        max_steps = 50
+        max_steps = 100
         num_choices = 3
 
         # Human latent parameters (set different values for each test)
@@ -311,16 +311,17 @@ if __name__ == '__main__':
         c = 10 #400  # exploration constant for UCT (taken as R_high - R_low)
         e = 0.1  # For epsilon-greedy policy
         epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-        num_iter = 500
+        num_iter = 100
         num_steps = max_steps
         initial_belief = []
 
         # Executes num_tests of experiments
 
-        num_test = 10
+        num_test = 1
         mean_rewards = []
         std_rewards = []
         all_rewards = []
+        map_ids = [2]
         for n in range(num_test):
             print("*********************************************************************")
             print("Executing test number {}......".format(n))
@@ -332,7 +333,7 @@ if __name__ == '__main__':
                 all_initial_belief_trust.append((1, 1))
 
             # Setup Driver
-            map_num = 1
+            map_num = map_ids[n]
             map = MAPS["MAP" + str(map_num)]
             foggy = FOG["MAP" + str(map_num)]
             human_err = HUMAN_ERR["MAP" + str(map_num)]
@@ -372,8 +373,8 @@ if __name__ == '__main__':
                 total_env_reward += env_reward
 
                 # reset root node belief to be initial belief
-                # root_node = RootNode(env, initial_belief)
-                # driver.solver.root_action_node = root_node
+                root_node = RootNode(env, initial_belief)
+                driver.solver.root_action_node = root_node
 
             print("===================================================================================================")
             print("===================================================================================================")

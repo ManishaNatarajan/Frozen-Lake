@@ -51,7 +51,8 @@ class BCDataset(BaseDataset):
         # all_episode_data = [extract_episode_data(all_files[0])]
 
         for episode in all_episode_data:
-            agent_obs = np.array(encode_full_state(map_id=episode["map_id"], states=episode["state"]))
+            agent_obs = np.array(encode_full_state(map_id=episode["map_id"], states=episode["state"],
+                                                   human_actions=episode["obs"]))
             # One hot encoding of the actions of both agents
             human_action = np.eye(self.num_human_actions)[episode["obs"]]
             robot_action = np.eye(self.num_robot_actions)[episode["action"]]

@@ -1,6 +1,7 @@
 # TODO: Redo this since we do not have any capability matrix
 import random as rand
 import operator
+import os
 
 from BC_POMCP.pomcp_env import *
 
@@ -11,7 +12,7 @@ class SimulatedHuman:
     """
 
     def __init__(self, env, true_trust=(1, 0),
-                true_capability=(0, 0, 0, 0), alpha=0.5, type="random"):
+                true_capability=(0, 0, 0, 0), alpha=0.5, type="random", seed=0):
         """
         Initializes an instance of simulated human.
 
@@ -27,6 +28,9 @@ class SimulatedHuman:
         self.true_human_trust = true_trust
         self.true_human_capability = true_capability
         self.type = type
+        rand.seed(seed)
+        np.random.seed(seed)
+        os.environ['PYTHONHASHSEED'] = str(seed)
 
     def simulateHumanAction(self, world_state, robot_action):
         """
@@ -188,14 +192,23 @@ class SimulatedHuman:
             shortest_path = find_shortest_path(self.env.desc, human_slippery, current_position, self.env.ncol)
 
             e = np.random.uniform()
-            if len(shortest_path) < 2: # No valid path
-                # Temporally use robot slippery region as the ground truth
-                true_shortest_path = find_shortest_path(self.env.desc, robot_slippery, current_position, self.env.ncol)
-                if len(true_shortest_path) > 1:
-                    true_best_action = true_shortest_path[1][1]
+            # if len(shortest_path) < 2: # No valid path
+            #     # Temporally use robot slippery region as the ground truth
+            true_shortest_path = find_shortest_path(self.env.desc, self.env.hole + self.env.slippery, current_position, self.env.ncol)
+            if len(true_shortest_path) > 1:
+                true_best_action = true_shortest_path[1][1]
+            else:
+                true_best_action = np.random.choice([0, 1, 2, 3])
+            if e < epsilon: # Choose best action using the human map
+                if len(shortest_path) > 1:
+                    best_action = shortest_path[1][1]
                 else:
-                    true_best_action = np.random.choice([0, 1, 2, 3])
-                if e < epsilon: # Choose action randomly
+                    best_action = np.random.choice([0, 1, 2, 3])
+                if best_action in actions:
+                    human_choice = best_action
+                else:
+                    # Cannot choose the best action because of acceptance,
+                    # so randomly choose another suboptimal action
                     if true_best_action in actions and len(actions) > 1:
                         actions.remove(true_best_action)
                     human_choice = np.random.choice(actions)
@@ -204,19 +217,7 @@ class SimulatedHuman:
                         actions.remove(human_choice)
                         human_choice = np.random.choice(actions)
                         s = self.env.move(current_position, human_choice)
-                else: # Choose optimal action
-                    human_choice = true_best_action
-            # Choose best action using the human map
-            else:
-                best_action = shortest_path[1][1]
-                if best_action in actions:
-                    human_choice = best_action
-                else:
-                    human_choice = np.random.choice(actions)
-                    s = self.env.move(current_position, human_choice)
-                    while s == current_position and len(actions) > 1:
-                        actions.remove(human_choice)
-                        human_choice = np.random.choice(actions)
-                        s = self.env.move(current_position, human_choice)
+            else: # Choose optimal action
+                human_choice = true_best_action
 
         return accept, detect, human_choice
