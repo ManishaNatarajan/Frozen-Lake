@@ -48,7 +48,7 @@ class HeuristicAgent:
     def get_action(self, env, human_action):
         position = env.world_state[0][-1]
         last_position = env.world_state[0][-2]
-        robot_slippery = env.world_state[3]
+        robot_slippery = env.world_state[len(env.world_state)-3]
         last_path = find_shortest_path(env.desc, robot_slippery, last_position, env.ncol)
         current_path = find_shortest_path(env.desc, robot_slippery, position, env.ncol)
         if env.desc[position // env.ncol, position % env.ncol] in b'HS':
@@ -139,19 +139,19 @@ def execute(round_num, num_steps, env, human_agent, robot_agent=None):
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [0, 5]:
+    for SEED in [0, 5, 21, 25, 42]:
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
 
         # Initialize constants for setting up the environment
-        max_steps = 100
+        max_steps = 30
         num_choices = 3
 
         # Human latent parameters (set different values for each test)
         true_trust = [(5, 50), (10, 40), (18, 40), (24, 36), (35, 35), (40, 65), (45, 20), (45, 56),
                       (40, 45), (99, 1)]
-        # true_trust = [(35, 35)]
+        # true_trust = [(5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50)]
         true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
         # true_aggressiveness = (25, 25)
 
@@ -163,67 +163,71 @@ if __name__ == '__main__':
 
         # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
         gamma = 0.99
-        c = 20  # Exploration bonus
+        c = 10  # Exploration bonus
         beta = 0.9
 
-        for n in range(num_test):
-            print("*********************************************************************")
-            print("Executing test number {}......".format(n))
-            print("*********************************************************************")
+        map_ids = [13]
 
-            # Setup Driver
-            map_num = 13
-            map = MAPS["MAP" + str(map_num)]
-            foggy = FOG["MAP" + str(map_num)]
-            human_err = HUMAN_ERR["MAP" + str(map_num)]
-            robot_err = ROBOT_ERR["MAP" + str(map_num)]
-            env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
-                                true_human_capability=true_capability,
-                                true_robot_capability=0.85, beta=beta,
-                                c=c, gamma=gamma, seed=SEED, human_type="random")
+        for m in map_ids:
 
-            # Reset the environment to initialize everything correctly
-            env.reset()
-            # robot_policy = RandomAgent(num_choices)
-            # robot_policy = StaticAgent(fixed_action=2)
-            # robot_policy = NoAssistAgent()
-            robot_policy = HeuristicAgent(type=2)
+            for n in range(num_test):
+                print("*********************************************************************")
+                print("Executing test number {}......".format(n))
+                print("*********************************************************************")
 
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
-                                             true_capability=true_capability,
-                                             type="epsilon_greedy")  # TODO: Can test with different humans
+                # Setup Driver
+                map_num = m
+                map = MAPS["MAP" + str(map_num)]
+                foggy = FOG["MAP" + str(map_num)]
+                human_err = HUMAN_ERR["MAP" + str(map_num)]
+                robot_err = ROBOT_ERR["MAP" + str(map_num)]
+                env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
+                                    is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
+                                    true_human_capability=true_capability,
+                                    true_robot_capability=0.85, beta=beta,
+                                    c=c, gamma=gamma, seed=SEED, human_type="epsilon_greedy")
 
-            # Executes num_rounds of search (calibration)
-            num_rounds = 10
-            total_env_reward = 0
+                # Reset the environment to initialize everything correctly
+                env.reset()
+                # robot_policy = RandomAgent(num_choices)
+                # robot_policy = StaticAgent(fixed_action=2)
+                # robot_policy = NoAssistAgent()
+                robot_policy = HeuristicAgent(type=2)
 
-            rewards = []
-            for i in range(num_rounds):
-                # We should only change the true state of the tiger for every round (or after every termination)
-                env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
+                simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
+                                                 true_capability=true_capability,
+                                                 type="epsilon_greedy")  # TODO: Can test with different humans
 
-                env_reward = execute(round_num=i, num_steps=max_steps, env=env,
-                                     human_agent=simulated_human, robot_agent=robot_policy)
-                rewards.append(env_reward)
-                total_env_reward += env_reward
+                # Executes num_rounds of search (calibration)
+                num_rounds = 10
+                total_env_reward = 0
 
+                rewards = []
+                for i in range(num_rounds):
+                    # We should only change the true state of the tiger for every round (or after every termination)
+                    env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
+
+                    env_reward = execute(round_num=i, num_steps=max_steps, env=env,
+                                         human_agent=simulated_human, robot_agent=robot_policy)
+                    rewards.append(env_reward)
+                    total_env_reward += env_reward
+
+                print("===================================================================================================")
+                print("===================================================================================================")
+                print("Average environmental reward after {} rounds:{}".format(num_rounds,
+                                                                               total_env_reward / float(num_rounds)))
+                all_rewards.append(rewards)
+                mean_rewards.append(np.mean(rewards))
+                std_rewards.append(np.std(rewards))
             print("===================================================================================================")
             print("===================================================================================================")
-            print("Average environmental reward after {} rounds:{}".format(num_rounds,
-                                                                           total_env_reward / float(num_rounds)))
-            all_rewards.append(rewards)
-            mean_rewards.append(np.mean(rewards))
-            std_rewards.append(np.std(rewards))
-        print("===================================================================================================")
-        print("===================================================================================================")
-        print(mean_rewards, std_rewards)
-        print("===================================================================================================")
-        print("===================================================================================================")
+            print(mean_rewards, std_rewards)
+            print("===================================================================================================")
+            print("===================================================================================================")
 
-        all_rewards = np.array(all_rewards)
-        # with open("files/random/{}.npy".format(SEED), 'wb') as f:
-        # with open("files/no_assist/{}.npy".format(SEED), 'wb') as f:
-        # # with open("files/static_take_control/{}.npy".format(SEED), 'wb') as f:
-        with open("logs/heuristic/simulated_human/take_control/map_{}_seed_{}_epsilon_{}.npy".format(map_num, SEED, 2), 'wb') as f:
-            np.save(f, all_rewards)
+            all_rewards = np.array(all_rewards)
+            # with open("files/random/{}.npy".format(SEED), 'wb') as f:
+            # with open("files/no_assist/{}.npy".format(SEED), 'wb') as f:
+            # # with open("files/static_take_control/{}.npy".format(SEED), 'wb') as f:
+            with open("logs/heuristic/simulated_human/take_control/map_{}_seed_{}_epsilon_{}.npy".format(map_num, SEED, 2), 'wb') as f:
+                np.save(f, all_rewards)
