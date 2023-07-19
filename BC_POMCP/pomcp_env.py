@@ -316,7 +316,7 @@ class FrozenLakeEnv:
                              conv_hidden=32, action_hidden=32, num_layers=1, use_actions=True)
 
         self.model = self.model.to(self.device)
-        self.model.load_state_dict(torch.load(os.path.join(model_folder_path, "best.pth")))
+        # self.model.load_state_dict(torch.load(os.path.join(model_folder_path, "best.pth")))
 
     def to_s(self, row, col):
         return row * self.ncol + col
@@ -680,17 +680,18 @@ class FrozenLakeEnv:
                 accept = 0
                 if human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
                     detect = 1
-            elif robot_assist_type == 1 or robot_assist_type == 3:  # Interrupt
+            elif robot_assist_type == 1 or robot_assist_type == 3: #Interrupt
+                # print(self.env.lastaction)
                 # User either chooses the robot's suggestion or their own based on their trust in the robot and their capablity
                 if robot_direction - 2 >= 0:
                     undo_action = robot_direction - 2
                 else:
                     undo_action = robot_direction + 2
-                if prob >= human_acceptance_probability:
+                if prob < human_acceptance_probability:
                     actions.remove(undo_action)
                     accept = 1  # Accept
                     # human_choice = np.random.choice(actions)
-                elif 0.5 * human_acceptance_probability <= prob < human_acceptance_probability:
+                elif human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
                     # Currently will choose the last position following epsilon-greedy strategy
                     if np.random.uniform() < detect_new_grid_prob:
                         actions.remove(undo_action)
@@ -701,9 +702,8 @@ class FrozenLakeEnv:
                 else:
                     actions = [undo_action]
                     accept = 2  # Reject
-
             else:  # taking control
-                if prob >= human_acceptance_probability:
+                if prob < human_acceptance_probability:
                     accept = 1
                     if robot_direction is not None:
                         if robot_direction - 2 >= 0:
@@ -719,7 +719,7 @@ class FrozenLakeEnv:
                             actions.remove(robot_direction - 2)
                         else:
                             actions.remove(robot_direction + 2)
-                # Return to the last state after refusing
+                    # Return to the last state after refusing
                 else:
                     accept = 2
                     if robot_direction is not None:
@@ -728,17 +728,26 @@ class FrozenLakeEnv:
                         else:
                             actions = [robot_direction + 2]
 
-            shortest_path = find_shortest_path(self.desc, human_slippery, current_position, self.ncol)
+            shortest_path = self.find_shortest_path(self.desc, human_slippery, current_position, self.ncol)
 
             e = np.random.uniform()
-            if len(shortest_path) < 2:  # No valid path
-                # Temporally use robot slippery region as the ground truth
-                true_shortest_path = find_shortest_path(self.desc, robot_slippery, current_position, self.ncol)
-                if len(true_shortest_path) > 1:
-                    true_best_action = true_shortest_path[1][1]
+            # if len(shortest_path) < 2: # No valid path
+            #     # Temporally use robot slippery region as the ground truth
+            true_shortest_path = self.find_shortest_path(self.desc, self.hole + self.slippery, current_position, self.ncol)
+            if len(true_shortest_path) > 1:
+                true_best_action = true_shortest_path[1][1]
+            else:
+                true_best_action = np.random.choice([0, 1, 2, 3])
+            if e < epsilon: # Choose best action using the human map
+                if len(shortest_path) > 1:
+                    best_action = shortest_path[1][1]
                 else:
-                    true_best_action = np.random.choice([0, 1, 2, 3])
-                if e < epsilon:  # Choose action randomly
+                    best_action = np.random.choice([0, 1, 2, 3])
+                if best_action in actions:
+                    human_choice = best_action
+                else:
+                    # Cannot choose the best action because of acceptance,
+                    # so randomly choose another suboptimal action
                     if true_best_action in actions and len(actions) > 1:
                         actions.remove(true_best_action)
                     human_choice = np.random.choice(actions)
@@ -747,20 +756,8 @@ class FrozenLakeEnv:
                         actions.remove(human_choice)
                         human_choice = np.random.choice(actions)
                         s = self.move(current_position, human_choice)
-                else:  # Choose optimal action
-                    human_choice = true_best_action
-            # Choose best action using the human map
-            else:
-                best_action = shortest_path[1][1]
-                if best_action in actions:
-                    human_choice = best_action
-                else:
-                    human_choice = np.random.choice(actions)
-                    s = self.move(current_position, human_choice)
-                    while s == current_position and len(actions) > 1:
-                        actions.remove(human_choice)
-                        human_choice = np.random.choice(actions)
-                        s = self.move(current_position, human_choice)
+            else: # Choose optimal action
+                human_choice = true_best_action
 
         return accept, detect, human_choice
 
