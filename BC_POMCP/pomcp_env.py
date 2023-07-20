@@ -286,7 +286,7 @@ class FrozenLakeEnv:
         #     'control': 2,
         #     'interrupt+explain': 3,
         #     'control+explain': 4
-        self.robot_action_space = spaces.MultiDiscrete([3, 4], seed=seed)
+        self.robot_action_space = spaces.MultiDiscrete([5, 4], seed=seed)
         # Human's action space is whether they accepted the robot's suggestion and the option that they choose
         self.human_action_space = spaces.MultiDiscrete([3, 2, 4], seed=seed)  # (no-assist/accept/reject, detect/no-detect, LEFT/DOWN/RIGHT/UP)
         # Robot's observation space (for now is the human's last action)
@@ -460,19 +460,26 @@ class FrozenLakeEnv:
                     if (row, col) not in next_human_slippery:
                         next_human_slippery.add((row, col))
                         next_human_err.add((row, col))
-                        # if (row, col) in self.human_err:
-                        #     self.human_err.remove((row, col))
+                    if (row, col) not in next_robot_slippery:
+                        next_robot_slippery.add((row, col))
+                        next_robot_err.add((row, col))
+
                 elif self.desc[row, col] in b'F':
                     if (row, col) in next_human_slippery:
-                        next_human_slippery.add((row, col))
+                        next_human_slippery.remove((row, col))
                         next_human_err.add((row, col))
-                        # if (row, col) in self.human_err:
-                        #     self.human_err.remove((row, col))
+                    if (row, col) in next_robot_slippery:
+                        next_robot_slippery.remove((row, col))
+                        next_robot_err.add((row, col))
+
+                return s, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
+
             else:  # No detection -> Move
                 s = self.move(position, human_direction)
                 self.s = s
                 next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery, robot_slippery, human_err, robot_err, detecting=True)
-            return s, next_human_slippery, next_robot_slippery, human_err, robot_err
+                # No need to update the human error and robot error (only updated if human uses the detection function)
+                return s, next_human_slippery, next_robot_slippery, human_err, robot_err
 
         # Robot Action
         else:
@@ -728,12 +735,12 @@ class FrozenLakeEnv:
                         else:
                             actions = [robot_direction + 2]
 
-            shortest_path = self.find_shortest_path(self.desc, human_slippery, current_position, self.ncol)
+            shortest_path = find_shortest_path(self.desc, human_slippery, current_position, self.ncol)
 
             e = np.random.uniform()
             # if len(shortest_path) < 2: # No valid path
             #     # Temporally use robot slippery region as the ground truth
-            true_shortest_path = self.find_shortest_path(self.desc, self.hole + self.slippery, current_position, self.ncol)
+            true_shortest_path = find_shortest_path(self.desc, self.hole + self.slippery, current_position, self.ncol)
             if len(true_shortest_path) > 1:
                 true_best_action = true_shortest_path[1][1]
             else:
@@ -829,7 +836,8 @@ class FrozenLakeEnv:
             s_previous = last_position
             shortest_path = find_shortest_path(self.desc, robot_slippery, s_previous, self.ncol)
             if len(shortest_path) < 2:
-                self.robot_action = self.get_next_action(s_previous, last_human_action)
+                # self.robot_action = self.get_next_action(s_previous, last_human_action)
+                return 0, None
             else:
                 best_action = shortest_path[1][1]
                 # if best_action == last_human_action:

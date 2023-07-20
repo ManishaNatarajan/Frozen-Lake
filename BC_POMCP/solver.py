@@ -44,8 +44,8 @@ class POMCPSolver:
         :param depth: (type: int) the current depth in the tree
         :return: (type: float) returns rollout value
         """
-        # human_action = self.env.get_rollout_observation(augmented_state, robot_action)
-        human_action = self.env.get_BC_observation(augmented_state, robot_action)
+        human_action = self.env.get_rollout_observation(augmented_state, robot_action)
+        # human_action = self.env.get_BC_observation(augmented_state, robot_action)
         # human_action = (0, 1)
         # value = self.env.reward(augmented_state, robot_action) + self.env.gamma * self.rollout_helper(copy.deepcopy(augmented_state), robot_action, human_action, depth)
         value = self.rollout_helper(
@@ -90,7 +90,10 @@ class POMCPSolver:
         second_augmented_state = self.env.augmented_state_transition(augmented_state, None, human_action)
 
         # next robot action --> sample from a uniform distribution
-        next_robot_action_type = self.env.robot_action_space.sample()[0]
+        if human_action[1] == 1:
+            next_robot_action_type = 0  # Don't interrupt if the human uses detection function
+        else:
+            next_robot_action_type = self.env.robot_action_space.sample()[0]
         # next_robot_action_type = 0
         next_robot_action = self.env.get_robot_action(second_augmented_state[:6], next_robot_action_type)
 
@@ -100,8 +103,8 @@ class POMCPSolver:
             return self.env.final_reward(next_augmented_state)
 
         # next_human_action = self.env.get_rollout_observation(augmented_state, next_robot_action) #next or augmented_state?
-        # next_human_action = self.env.get_rollout_observation(next_augmented_state, next_robot_action)
-        next_human_action = self.env.get_BC_observation(next_augmented_state, next_robot_action)
+        next_human_action = self.env.get_rollout_observation(next_augmented_state, next_robot_action)
+        # next_human_action = self.env.get_BC_observation(next_augmented_state, next_robot_action)
 
         # Recursive rollout
         return self.env.reward(next_augmented_state, next_robot_action, next_human_action) + self.env.gamma * self.rollout_helper(next_augmented_state,
@@ -135,7 +138,12 @@ class POMCPSolver:
         world_state = augmented_state[:6]
 
         # Finds optimal robot action based on the UCT policy
-        robot_action_type = action_node.optimal_robot_action(self.c)
+        # Do not interrupt in case of detection...
+        if world_state[0][0] == world_state[0][1]:
+            # i.e., position history has not changed... (after human action, the position history remains unchanged only in the case of detection)
+            robot_action_type = 0
+        else:
+            robot_action_type = action_node.optimal_robot_action(self.c)
         # robot_action_type = 0
         robot_action = self.env.get_robot_action(world_state, robot_assistance_mode=robot_action_type)
         robot_action_node = action_node.robot_node_children[robot_action_type]
@@ -156,8 +164,8 @@ class POMCPSolver:
 
         # Simulate human action
         # human_action = self.env.get_observation(augmented_state, robot_action_node, True) # TODO: Check this and see how this is different from get_rollout_observation
-        # human_action = self.env.get_rollout_observation(second_augmented_state, robot_action)
-        human_action = self.env.get_BC_observation(second_augmented_state, robot_action)
+        human_action = self.env.get_rollout_observation(second_augmented_state, robot_action)
+        # human_action = self.env.get_BC_observation(second_augmented_state, robot_action)
         next_augmented_state = self.env.augmented_state_transition(second_augmented_state, robot_action, human_action)
 
         next_action_node = robot_action_node.human_node_children[human_action[1]*4 + human_action[2]]

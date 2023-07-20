@@ -73,6 +73,7 @@ class Driver:
             return
         # Update the belief (i.e., all particles) in the current node to match the current world state
         if human_action_node.belief[0][:len(env.world_state)] != env.world_state:
+            print("WHY AM I HERE???")
             human_action_node.belief = [env.world_state + [belief[-2]] + [belief[-1]] for belief in human_action_node.belief]
 
     def updateBeliefChiH(self, human_action_node, human_action):
@@ -168,21 +169,24 @@ class Driver:
 
         # Initial human action
         robot_action = (0, None) # No interruption
-        init_human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-        # init_human_action = (0, 2)
-        # print("Human Initial Action: ", init_human_action)
+        human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
+        # human_action = (0, 2)
+        # print("Human Initial Action: ", human_action)
         # Here we are adding to the tree as this will become the root for the search in the next turn
         human_action_node = HumanActionNode(env)
         # This is where we call invigorate belief... When we add a new human action node to the tree
-        self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, init_human_action, env)
+        self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
         solver.root_action_node = human_action_node
-        env.world_state = env.world_state_transition(env.world_state, robot_action, init_human_action)
+        env.world_state = env.world_state_transition(env.world_state, robot_action, human_action)
         all_states.append(env.world_state[0])
-        final_env_reward += env.reward(env.world_state, (0, None), init_human_action)
-        human_actions.append(init_human_action)
+        final_env_reward += env.reward(env.world_state, (0, None), human_action)
+        human_actions.append(human_action)
 
         for step in range(self.num_steps):
-            robot_action_type = solver.search()  # One iteration of the POMCP search  # Here the robot action indicates the type of assistance
+            if human_action[1] == 1:
+                robot_action_type = 0  # Do not interrupt if the human uses detection function
+            else:
+                robot_action_type = solver.search()  # One iteration of the POMCP search  # Here the robot action indicates the type of assistance
             robot_action_node = solver.root_action_node.robot_node_children[robot_action_type]
 
             if debug_tree:
@@ -209,8 +213,8 @@ class Driver:
 
             # Note here that it is not the augmented state
             # (the latent parameters are already defined in the SimulatedHuman model I think)
-            # human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-            human_action = list(env.get_BC_observation(env.world_state, robot_action))  # Get human action from the BC model
+            human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
+            # human_action = list(env.get_BC_observation(env.world_state, robot_action))  # Get human action from the BC model
             # human_action[-1] = int(human_action[-1].detach().cpu().numpy())  # Convert model prediction from tensor to int
 
             human_action_node = robot_action_node.human_node_children[human_action[1]*4 + human_action[2]]
@@ -287,13 +291,13 @@ class Driver:
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [5]:  #[0, 5, 21, 25, 42]
+    for SEED in [0]:  #[0, 5, 21, 25, 42]
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
 
         # Initialize constants for setting up the environment
-        max_steps = 100
+        max_steps = 50
         num_choices = 3
 
         # Human latent parameters (set different values for each test)
@@ -308,7 +312,7 @@ if __name__ == '__main__':
 
         # factors for POMCP
         gamma = 0.99  # gamma for terminating rollout based on depth in MCTS
-        c = 10 #400  # exploration constant for UCT (taken as R_high - R_low)
+        c = 20 #400  # exploration constant for UCT (taken as R_high - R_low)
         e = 0.1  # For epsilon-greedy policy
         epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
         num_iter = 100
@@ -317,11 +321,11 @@ if __name__ == '__main__':
 
         # Executes num_tests of experiments
 
-        num_test = 1
+        num_test = 10
         mean_rewards = []
         std_rewards = []
         all_rewards = []
-        map_ids = [2]
+        map_ids = [13]
         for n in range(num_test):
             print("*********************************************************************")
             print("Executing test number {}......".format(n))
@@ -333,7 +337,7 @@ if __name__ == '__main__':
                 all_initial_belief_trust.append((1, 1))
 
             # Setup Driver
-            map_num = map_ids[n]
+            map_num = 7
             map = MAPS["MAP" + str(map_num)]
             foggy = FOG["MAP" + str(map_num)]
             human_err = HUMAN_ERR["MAP" + str(map_num)]
@@ -361,7 +365,7 @@ if __name__ == '__main__':
             driver = Driver(env, solver, num_steps, simulated_human)
 
             # Executes num_rounds of search (calibration)
-            num_rounds = 5
+            num_rounds = 10
             total_env_reward = 0
 
             rewards = []
@@ -373,8 +377,8 @@ if __name__ == '__main__':
                 total_env_reward += env_reward
 
                 # reset root node belief to be initial belief
-                root_node = RootNode(env, initial_belief)
-                driver.solver.root_action_node = root_node
+                # root_node = RootNode(env, initial_belief)
+                # driver.solver.root_action_node = root_node
 
             print("===================================================================================================")
             print("===================================================================================================")
@@ -391,5 +395,5 @@ if __name__ == '__main__':
         print("===================================================================================================")
 
         all_rewards = np.array(all_rewards)
-        with open("logs/pomcp_BC/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
+        with open("logs/pomcp/simulated_human/map{}_seed{}_epsilon_{}_iter{}.npy".format(map_num, SEED, 2, num_iter), 'wb') as f:
             np.save(f, all_rewards)
