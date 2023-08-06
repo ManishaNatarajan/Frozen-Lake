@@ -228,7 +228,8 @@ def extract_episode_data(filename, map_ids=(4, 5, 6, 7, 8, 9, 10, 11, 12, 13)):
             "reward": rewards,
             "timestep": timesteps,
             "dones": dones,
-            "map_id": id
+            "map_id": id,
+            "last_action": last_human_actions
         }
 
         episode_data.append(episode)

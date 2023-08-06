@@ -62,12 +62,18 @@ class BCDataset(BaseDataset):
                 self.human_actions = human_action
                 self.robot_actions = robot_action
                 self.dones = episode["dones"]
+                self.last_states = episode["last_state"]
+                self.current_states = episode["state"]
+                self.last_actions = episode["last_action"]
 
             else:
                 self.agent_obs = np.concatenate((self.agent_obs, agent_obs), axis=0)
                 self.human_actions = np.concatenate((self.human_actions, human_action), axis=0)
                 self.robot_actions = np.concatenate((self.robot_actions, robot_action), axis=0)
                 self.dones = np.append(self.dones, episode["dones"])
+                self.last_states = np.concatenate((self.last_states, episode["last_state"]), axis=0)
+                self.current_states = np.concatenate((self.current_states, episode["state"]), axis=0)
+                self.last_actions = np.append(self.last_actions, episode["last_action"])
 
         self.done_idxs = np.where(self.dones == 1)[0]  # Mark the end of an episode
 
