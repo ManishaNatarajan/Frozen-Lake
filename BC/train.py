@@ -117,23 +117,27 @@ def main():
     learning_rate = 1e-3
     use_actions = True
 
+    num_human_actions = 5
+
     # Load datasets
     train_path = "data/User_Study_1/RL_data/train/"
     test_path = "data/User_Study_1/RL_data/val/"
 
-    train_dataset = BCDataset(folder_path=train_path, sequence_length=seq_len, use_actions=use_actions)
+    train_dataset = BCDataset(folder_path=train_path, sequence_length=seq_len, use_actions=use_actions,
+                              num_human_actions=num_human_actions)
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 
-    test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions)
+    test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions,
+                             num_human_actions=num_human_actions)
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
 
-    model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=3,
+    model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=num_human_actions,
                     conv_hidden=32, action_hidden=32, num_layers=1, use_actions=use_actions)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model = model.to(device)
 
-    log_dir = "BC_logs/updated/"
+    log_dir = "BC_logs/"
 
     train(device=device, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
           batch_size=batch_size, model=model, learning_rate=learning_rate, n_epochs=epochs, log_dir=log_dir,

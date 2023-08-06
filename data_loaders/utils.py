@@ -60,6 +60,16 @@ def convert_human_actions(last_human_actions, current_human_actions, robot_actio
     return updated_human_actions
 
 
+def convert_human_actions_with_detect(human_actions):
+    """
+    Convert human actions to five classes: the direction they choose to move and whether they detected
+    :param human_actions:
+    :return:
+    """
+    human_actions[human_actions >= 4] = 4  # Detection
+    return human_actions
+
+
 def check_neighboring_states(row, col, human_map, slippery_states, detected_error):
     """
     Detect if neighboring states are slippery regions based on map
@@ -203,6 +213,7 @@ def extract_episode_data(filename, map_ids=(4, 5, 6, 7, 8, 9, 10, 11, 12, 13)):
                                               robot_actions=robot_actions,
                                               last_state=last_states,
                                               current_state=curr_states)
+        # human_actions = convert_human_actions_with_detect(human_actions)
 
         rewards = map_data["reward"].to_numpy()
         timesteps = map_data["timestep"].to_numpy()

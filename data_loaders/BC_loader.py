@@ -32,10 +32,10 @@ class BaseDataset(torch.utils.data.Dataset):
 
 
 class BCDataset(BaseDataset):
-    def __init__(self, folder_path, sequence_length, use_actions=False):
+    def __init__(self, folder_path, sequence_length, num_human_actions=5, use_actions=False):
         self.process_first_episode = True
         self.use_actions = use_actions
-        self.num_human_actions = 3
+        self.num_human_actions = num_human_actions
         self.num_robot_actions = 5
 
         super().__init__(folder_path, sequence_length)
