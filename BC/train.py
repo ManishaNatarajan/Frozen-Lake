@@ -113,7 +113,7 @@ def main():
     # Set train parameters
     batch_size = 32
     seq_len = 16
-    epochs = 250
+    epochs = 100
     learning_rate = 1e-3
     use_actions = True
 
@@ -127,13 +127,13 @@ def main():
     test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions)
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
 
-    model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=5,
+    model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=3,
                     conv_hidden=32, action_hidden=32, num_layers=1, use_actions=use_actions)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model = model.to(device)
 
-    log_dir = "BC_logs/"
+    log_dir = "BC_logs/updated/"
 
     train(device=device, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
           batch_size=batch_size, model=model, learning_rate=learning_rate, n_epochs=epochs, log_dir=log_dir,

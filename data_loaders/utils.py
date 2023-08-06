@@ -18,9 +18,46 @@ def convert_robot_actions(robot_type, actions):
     return actions
 
 
-def convert_human_actions(actions):
-    actions[actions >= 4] = 4  # Detection
-    return actions
+def convert_human_actions(last_human_actions, current_human_actions, robot_actions, last_state, current_state):
+    """
+    Convert human actions to proceed(0), oppose(1) or detect(2)
+    :param last_human_actions:
+    :param current_human_actions:
+    :param robot_actions:
+    :param last_state:
+    :param current_state:
+    :return:
+    """
+    updated_human_actions = np.zeros_like(current_human_actions)
+    updated_human_actions[current_human_actions >= 4] = 2  # Detection
+
+    # Whenever the robot interrupts
+    # Human opposed if last_human_action == current_human_action
+    tmp_last_actions = last_human_actions[np.logical_or(robot_actions == 1, robot_actions == 3)]  # last actions when robot interrupted
+    tmp_curr_actions = current_human_actions[np.logical_or(robot_actions == 1, robot_actions == 3)]   # current actions when robot interrupted
+    tmp_updated_human_actions = updated_human_actions[np.logical_or(robot_actions == 1, robot_actions == 3)]
+    tmp_updated_human_actions[tmp_last_actions == tmp_curr_actions] = 1
+    updated_human_actions[np.where(np.logical_or(robot_actions == 1, robot_actions == 3))] = tmp_updated_human_actions
+
+    # Whenever the robot takes control
+    # Human opposed if the current human action is opposite of the robot's take control action
+    tmp_last_states = last_state[np.logical_or(robot_actions == 2, robot_actions == 4)]  # last states when robot took over
+    tmp_curr_states = current_state[np.logical_or(robot_actions == 2, robot_actions == 4)]  # current states when robot took over
+    tmp_curr_actions = current_human_actions[np.logical_or(robot_actions == 2, robot_actions == 4)]
+    robot_direction = tmp_curr_states - tmp_last_states
+
+    # Robot direction: 8(down:1), -8(up:3), 1(right:2), -1(left:0)
+    # Storing the opposite direction, so that it's easier to compare with human action to check whether they opposed
+    robot_direction[robot_direction == 8] = 3
+    robot_direction[robot_direction == -8] = 1
+    robot_direction[robot_direction == 1] = 0
+    robot_direction[robot_direction == -1] = 2
+
+    tmp_updated_human_actions = updated_human_actions[np.logical_or(robot_actions == 2, robot_actions == 4)]
+    tmp_updated_human_actions[robot_direction == tmp_curr_actions] = 1
+    updated_human_actions[np.where(np.logical_or(robot_actions == 2, robot_actions == 4))] = tmp_updated_human_actions
+
+    return updated_human_actions
 
 
 def check_neighboring_states(row, col, human_map, slippery_states, detected_error):
@@ -154,23 +191,29 @@ def extract_episode_data(filename, map_ids=(4, 5, 6, 7, 8, 9, 10, 11, 12, 13)):
     episode_data = []
     for id in map_ids:
         map_data = df.loc[df['map'] == id]
-        states = map_data["last_state"].to_numpy()
-        next_states = map_data["current_state"].to_numpy()
+        last_states = map_data["last_state"].to_numpy()
+        curr_states = map_data["current_state"].to_numpy()
         robot_type = map_data["robot_type"].to_numpy()[0]
         robot_actions = map_data["robot_action"].to_numpy()
-        robot_actions = convert_robot_actions(robot_type, robot_actions)
-        human_actions = map_data["last_human_action"].to_numpy()
-        human_actions = convert_human_actions(human_actions)
+        robot_actions = convert_robot_actions(robot_type, robot_actions)  # Convert robot actions to 0,1,2,3,4 (based on intervention type)
+        last_human_actions = map_data["last_human_action"].to_numpy()
+        human_actions = map_data["current_human_action"].to_numpy()
+        human_actions = convert_human_actions(last_human_actions=last_human_actions,
+                                              current_human_actions=human_actions,
+                                              robot_actions=robot_actions,
+                                              last_state=last_states,
+                                              current_state=curr_states)
+
         rewards = map_data["reward"].to_numpy()
         timesteps = map_data["timestep"].to_numpy()
         dones = np.zeros((timesteps.shape[0], 1))
         dones[-1] = 1
 
         episode = {
-            "state": states,
+            "state": curr_states,
             "action": robot_actions,
             "obs": human_actions,
-            "next_state": next_states,
+            "last_state": last_states,
             "reward": rewards,
             "timestep": timesteps,
             "dones": dones,

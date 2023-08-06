@@ -35,7 +35,7 @@ class BCDataset(BaseDataset):
     def __init__(self, folder_path, sequence_length, use_actions=False):
         self.process_first_episode = True
         self.use_actions = use_actions
-        self.num_human_actions = 5
+        self.num_human_actions = 3
         self.num_robot_actions = 5
 
         super().__init__(folder_path, sequence_length)

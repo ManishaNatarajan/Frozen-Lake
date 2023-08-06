@@ -149,7 +149,7 @@ class Driver:
         """
         raise NotImplementedError
 
-    def execute(self, round_num, debug_tree=False):
+    def execute(self, round_num, debug_tree=True):
         """
         Executes one round of search with the POMCP policy
         :param round_num: (type: int) the round number of the current execution
