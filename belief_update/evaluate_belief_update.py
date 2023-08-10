@@ -110,6 +110,9 @@ def max_entropy_reinvigorate_particles(particle_set, min_particles=100):
         wts = np.exp(wts)/np.sum(np.exp(wts))
         # Resample particles based on entropy weights
         resample_idxs = np.random.choice(np.arange(len(particle_set)), min_particles-len(particle_set), p=wts)
+        # I guess sampling only by entropy weights does not mean that it will pick a diverse set of particles,
+        # if one particle has the highest entropy (say uniform distribution) then that particle is more likely to be
+        # resampled repeatedly...
 
         for i in resample_idxs:
             new_particle = copy.deepcopy(particle_set[i])
@@ -162,8 +165,8 @@ if __name__ == '__main__':
         model_prediction_probs = counts/np.sum(counts)
         true_val = np.eye(num_human_actions)[current_human_action]
         predicted_val = np.random.choice(np.arange(num_human_actions), p=model_prediction_probs)
-        belief = reinvigorate_particles(belief, min_particles=400)
-        # belief = max_entropy_reinvigorate_particles(belief, min_particles=500)
+        # belief = reinvigorate_particles(belief, min_particles=400)
+        belief = max_entropy_reinvigorate_particles(belief, min_particles=500)
 
         # Get stats
         accuracy += current_human_action == predicted_val
