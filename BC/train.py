@@ -11,6 +11,7 @@ from tqdm import tqdm
 import random
 from data_loaders.BC_loader import BCDataset
 from BC.model import BCModel
+from sklearn.model_selection import KFold
 
 
 def train(device, train_dataloader, test_dataloader,
@@ -91,7 +92,8 @@ def train(device, train_dataloader, test_dataloader,
                 batch_test_loss += test_loss.item()
 
                 # Compute accuracy...
-                accuracy += torch.sum(torch.argmax(model_predictions, axis=-1) == torch.argmax(y_test, axis=-1))/(y_test.shape[0])
+                accuracy += torch.sum(torch.argmax(model_predictions, axis=-1) == torch.argmax(y_test, axis=-1)) / (
+                    y_test.shape[0])
                 # vals, prediction_counts = torch.argmax(model_predictions, axis=-1).unique(return_counts=True)
                 # print(vals, prediction_counts)
 
@@ -122,26 +124,43 @@ def main():
     # Load datasets
     train_path = "data/User_Study_1/RL_data/train/"
     test_path = "data/User_Study_1/RL_data/val/"
+    train_val_path = "data/User_Study_1/RL_data/train_val/"
 
-    train_dataset = BCDataset(folder_path=train_path, sequence_length=seq_len, use_actions=use_actions,
-                              num_human_actions=num_human_actions)
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    kf = KFold(n_splits=5)
 
-    test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions,
-                             num_human_actions=num_human_actions)
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    dataset = BCDataset(folder_path=train_val_path, sequence_length=seq_len, use_actions=use_actions,
+                        num_human_actions=num_human_actions)
 
-    model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=num_human_actions,
-                    conv_hidden=32, action_hidden=32, num_layers=1, use_actions=use_actions)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # train_dataset = BCDataset(folder_path=train_path, sequence_length=seq_len, use_actions=use_actions,
+    #                           num_human_actions=num_human_actions)
+    # train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    #
+    # test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions,
+    #                          num_human_actions=num_human_actions)
+    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
 
-    model = model.to(device)
+    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+        print('------------fold no---------{}----------------------'.format(fold))
+        train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
+        test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
 
-    log_dir = "BC_logs/"
+        train_dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
+                                      sampler=train_subsampler)
 
-    train(device=device, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
-          batch_size=batch_size, model=model, learning_rate=learning_rate, n_epochs=epochs, log_dir=log_dir,
-          use_actions=use_actions)
+        test_dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
+                                     sampler=test_subsampler)
+
+        model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=num_human_actions,
+                        conv_hidden=32, action_hidden=32, num_layers=1, use_actions=use_actions)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        model = model.to(device)
+
+        log_dir = "BC_logs/"
+
+        train(device=device, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
+              batch_size=batch_size, model=model, learning_rate=learning_rate, n_epochs=epochs, log_dir=log_dir,
+              use_actions=use_actions)
 
 
 if __name__ == '__main__':
