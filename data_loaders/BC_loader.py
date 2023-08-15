@@ -41,7 +41,10 @@ class BCDataset(BaseDataset):
         super().__init__(folder_path, sequence_length)
 
     def _load_data(self, folder_path):
-        all_files = glob.glob(self.folder_path + "*.csv")
+        if type(folder_path) == str:
+            all_files = glob.glob(self.folder_path + "*.csv")
+        else:
+            all_files = folder_path
         # Load all map 5 rollouts of every user in the folder path
         all_episode_data = []
         for file in all_files:

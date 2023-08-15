@@ -128,27 +128,23 @@ def main():
 
     kf = KFold(n_splits=5)
 
-    dataset = BCDataset(folder_path=train_val_path, sequence_length=seq_len, use_actions=use_actions,
-                        num_human_actions=num_human_actions)
+    # get list of all files:
+    import glob
+    all_files = glob.glob(train_val_path + "*.csv")
+    for fold, (train_idx, test_idx) in enumerate(kf.split(all_files)):
+        print('Fold: {}, Test Idx: {}'.format(fold, test_idx))
+        train_files = [all_files[t] for t in train_idx]
+        test_files = [all_files[t] for t in test_idx]
 
-    # train_dataset = BCDataset(folder_path=train_path, sequence_length=seq_len, use_actions=use_actions,
-    #                           num_human_actions=num_human_actions)
-    # train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-    #
-    # test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions,
-    #                          num_human_actions=num_human_actions)
-    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+        train_dataset = BCDataset(folder_path=train_files, sequence_length=seq_len, use_actions=use_actions,
+                                  num_human_actions=num_human_actions)
 
-    for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
-        print('------------fold no---------{}----------------------'.format(fold))
-        train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
-        test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
+        train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 
-        train_dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
-                                      sampler=train_subsampler)
+        test_dataset = BCDataset(folder_path=test_files, sequence_length=seq_len, use_actions=use_actions,
+                                 num_human_actions=num_human_actions)
 
-        test_dataloader = DataLoader(dataset=dataset, batch_size=batch_size,
-                                     sampler=test_subsampler)
+        test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
 
         model = BCModel(obs_shape=(8, 8, 3), robot_action_shape=5, human_action_shape=num_human_actions,
                         conv_hidden=32, action_hidden=32, num_layers=1, use_actions=use_actions)
@@ -156,7 +152,7 @@ def main():
 
         model = model.to(device)
 
-        log_dir = "BC_logs/"
+        log_dir = "BC_logs/k_fold/"
 
         train(device=device, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
               batch_size=batch_size, model=model, learning_rate=learning_rate, n_epochs=epochs, log_dir=log_dir,
