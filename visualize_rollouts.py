@@ -17,30 +17,21 @@ CONDITION = {
 }
 
 
-if __name__ == '__main__':
-    # Set seed for reproducibility
-    SEED = 0
-    random.seed(SEED)
-    np.random.seed(SEED)
-    os.environ['PYTHONHASHSEED'] = str(SEED)
-
-    # Initialize pygame
-    pygame.init()
-    pygame.display.init()
-    pygame.display.set_caption("Frozen Lake")
-    window_surface = pygame.display.set_mode((min(100 * 8, 1024) + 256 * 2, min(100 * 8, 800) + 300))
-    pygame.font.init()
-    font = pygame.font.Font(None, 30)
-
-    # Load a trajectory from json
-    with open("frozen_lake/files/user_study/cHtG2.json", "r") as f:
-        user_data = json.load(f)
+def view_rollout(user_data, rollout_idx=4, SEED=0):
+    # Initialize pygame (already initialized in the env.render() for the interface)
+    # pygame.init()
+    # pygame.display.init()
+    # pygame.display.set_caption("Frozen Lake")
+    # window_surface = pygame.display.set_mode((min(100 * 8, 1024) + 256 * 2, min(100 * 8, 800) + 300))
+    # pygame.font.init()
+    # font = pygame.font.Font(None, 30)
 
     # Ignore the practice rollouts
-    map_num = user_data["mapOrder"][4]
-    rollout = user_data["4"]["history"]
+    map_num = user_data["mapOrder"][rollout_idx]
+    rollout = user_data[str(rollout_idx)]["history"]
     map = MAPS["MAP" + str(map_num)]
     foggy = FOG["MAP" + str(map_num)]
+
     human_err = HUMAN_ERR["MAP" + str(map_num)]
     robot_err = ROBOT_ERR["MAP" + str(map_num)]
 
@@ -55,7 +46,6 @@ if __name__ == '__main__':
 
     # Reset the environment to initialize everything correctly
     env.reset(round_num=round_num)
-    init_world_state = env.world_state
 
     detection_num = 0
     step = 0
@@ -64,11 +54,13 @@ if __name__ == '__main__':
         curr_human_action = rollout[t]['human_action']
         curr_robot_action = rollout[t]['robot_action']
 
+        print(curr_human_action, curr_robot_action)
+
         is_accept, detecting, action = curr_human_action
         if detecting:
             # TODO: Render detection action
             env.render(round_num, None, None, env.world_state)
-            time.sleep(0.5)
+            time.sleep(2.5)
             detection_num += 1
             step += 1  # one extra step penalty for using detection
 
@@ -78,8 +70,23 @@ if __name__ == '__main__':
         env.world_state = env.world_state_transition(env.world_state, None, curr_human_action)
         env.world_state = env.world_state_transition(env.world_state, curr_robot_action, None)
         # Visualize after robot action
-        env.render(round_num=round_num, human_action=curr_human_action, robot_action=curr_robot_action, world_state=env.world_state)
+        env.render(round_num=round_num, human_action=curr_human_action, robot_action=curr_robot_action,
+                   world_state=env.world_state)
         if curr_robot_action[0] > 0:
-            time.sleep(1.5)
+            time.sleep(2.5)
             # input("Press enter to continue")
-        time.sleep(0.5)
+        time.sleep(2.5)
+
+
+if __name__ == '__main__':
+    # Set seed for reproducibility
+    SEED = 0
+    random.seed(SEED)
+    np.random.seed(SEED)
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+
+    # Load a trajectory from json
+    with open("frozen_lake/files/user_study/cHtG2.json", "r") as f:
+        user_data = json.load(f)
+
+    view_rollout(user_data)
