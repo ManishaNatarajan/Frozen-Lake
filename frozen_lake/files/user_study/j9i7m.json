@@ -1,0 +1,888 @@
+{
+    "expOrder": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        8,
+        9,
+        6,
+        7
+    ],
+    "mapOrder": [
+        0,
+        2,
+        3,
+        6,
+        10,
+        11,
+        12,
+        4,
+        5,
+        7
+    ],
+    "4": {
+        "history": [
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    3,
+                    0
+                ],
+                "last_state": 1,
+                "current_state": 0,
+                "type": "ice",
+                "score": -2
+            },
+            {
+                "human_action": [
+                    2,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    4,
+                    1
+                ],
+                "last_state": 1,
+                "current_state": 8,
+                "type": "ice",
+                "score": -3
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 16,
+                "current_state": 16,
+                "type": "ice",
+                "score": -4
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    4,
+                    1
+                ],
+                "last_state": 17,
+                "current_state": 24,
+                "type": "ice",
+                "score": -5
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 32,
+                "current_state": 32,
+                "type": "ice",
+                "score": -6
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 40,
+                "current_state": 40,
+                "type": "ice",
+                "score": -7
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 41,
+                "current_state": 41,
+                "type": "ice",
+                "score": -8
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 42,
+                "current_state": 42,
+                "type": "ice",
+                "score": -9
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 43,
+                "current_state": 43,
+                "type": "ice",
+                "score": -10
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 51,
+                "current_state": 51,
+                "type": "ice",
+                "score": -11
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 59,
+                "current_state": 59,
+                "type": "ice",
+                "score": -12
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 60,
+                "current_state": 60,
+                "type": "ice",
+                "score": -13
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 61,
+                "current_state": 61,
+                "type": "ice",
+                "score": -14
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 53,
+                "current_state": 53,
+                "type": "ice",
+                "score": -15
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 45,
+                "current_state": 45,
+                "type": "ice",
+                "score": -16
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 46,
+                "current_state": 46,
+                "type": "ice",
+                "score": -17
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 47,
+                "current_state": 47,
+                "type": "ice",
+                "score": -18
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 55,
+                "current_state": 55,
+                "type": "ice",
+                "score": -19
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 63,
+                "current_state": 63,
+                "type": "ice",
+                "score": 11
+            }
+        ],
+        "duration": 176.33105778694153,
+        "explanation": null,
+        "optimal_path": 19
+    },
+    "5": {
+        "history": [
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    2,
+                    1
+                ],
+                "last_state": 1,
+                "current_state": 8,
+                "type": "ice",
+                "score": -2
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    3,
+                    0
+                ],
+                "last_state": 9,
+                "current_state": 8,
+                "type": "ice",
+                "score": -3
+            },
+            {
+                "human_action": [
+                    2,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    3,
+                    0
+                ],
+                "last_state": 9,
+                "current_state": 8,
+                "type": "ice",
+                "score": -4
+            },
+            {
+                "human_action": [
+                    2,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    2,
+                    1
+                ],
+                "last_state": 9,
+                "current_state": 16,
+                "type": "ice",
+                "score": -5
+            },
+            {
+                "human_action": [
+                    0,
+                    1,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 16,
+                "current_state": 16,
+                "type": "ice",
+                "score": -7
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 8,
+                "current_state": 8,
+                "type": "ice",
+                "score": -8
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 9,
+                "current_state": 9,
+                "type": "ice",
+                "score": -9
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 10,
+                "current_state": 10,
+                "type": "ice",
+                "score": -10
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    1,
+                    0
+                ],
+                "last_state": 11,
+                "current_state": 10,
+                "type": "ice",
+                "score": -11
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    0
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    1,
+                    2
+                ],
+                "last_state": 9,
+                "current_state": 10,
+                "type": "ice",
+                "score": -12
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 18,
+                "current_state": 18,
+                "type": "ice",
+                "score": -13
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 26,
+                "current_state": 26,
+                "type": "ice",
+                "score": -14
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    4,
+                    0
+                ],
+                "last_state": 34,
+                "current_state": 25,
+                "type": "ice",
+                "score": -15
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 33,
+                "current_state": 33,
+                "type": "ice",
+                "score": -16
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    0
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 32,
+                "current_state": 32,
+                "type": "ice",
+                "score": -17
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 40,
+                "current_state": 40,
+                "type": "ice",
+                "score": -18
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 48,
+                "current_state": 48,
+                "type": "ice",
+                "score": -19
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 56,
+                "current_state": 56,
+                "type": "ice",
+                "score": -20
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 57,
+                "current_state": 57,
+                "type": "ice",
+                "score": -21
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 58,
+                "current_state": 58,
+                "type": "ice",
+                "score": -22
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    3,
+                    0
+                ],
+                "last_state": 59,
+                "current_state": 58,
+                "type": "ice",
+                "score": -23
+            },
+            {
+                "human_action": [
+                    2,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 59,
+                "current_state": 59,
+                "type": "ice",
+                "score": -24
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 60,
+                "current_state": 60,
+                "type": "ice",
+                "score": -25
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 61,
+                "current_state": 61,
+                "type": "ice",
+                "score": -26
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    4,
+                    0
+                ],
+                "last_state": 53,
+                "current_state": 60,
+                "type": "ice",
+                "score": -27
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 52,
+                "current_state": 52,
+                "type": "ice",
+                "score": -28
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    3
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 44,
+                "current_state": 44,
+                "type": "ice",
+                "score": -29
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 45,
+                "current_state": 45,
+                "type": "ice",
+                "score": -30
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    2,
+                    3
+                ],
+                "last_state": 46,
+                "current_state": 37,
+                "type": "ice",
+                "score": -31
+            },
+            {
+                "human_action": [
+                    1,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 38,
+                "current_state": 38,
+                "type": "ice",
+                "score": -32
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    2
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 39,
+                "current_state": 39,
+                "type": "ice",
+                "score": -33
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 47,
+                "current_state": 47,
+                "type": "ice",
+                "score": -34
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 55,
+                "current_state": 55,
+                "type": "ice",
+                "score": -35
+            },
+            {
+                "human_action": [
+                    0,
+                    0,
+                    1
+                ],
+                "condition": "pomcp",
+                "robot_action": [
+                    0,
+                    null
+                ],
+                "last_state": 63,
+                "current_state": 63,
+                "type": "ice",
+                "score": -5
+            }
+        ],
+        "duration": 529.9432582855225,
+        "explanation": null,
+        "optimal_path": 25
+    }
+}
