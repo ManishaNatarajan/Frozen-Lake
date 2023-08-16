@@ -2,15 +2,11 @@
 # Implemented by Manisha Natarajan
 # Last Update: 04/24/2023
 
-import os
-
-from frozen_lake.frozen_lake_env import *
 from frozen_lake.solver import *
 from frozen_lake.root_node import *
 from frozen_lake.robot_action_node import *
 from frozen_lake.human_action_node import *
 from frozen_lake.simulated_human import *
-from utils import *
 import time
 import pygame
 import string
@@ -31,8 +27,8 @@ expOrder = [0, 1, 2, 3, order[0], order[0] + 1, order[1], order[1] + 1, order[2]
 print("expOrder", expOrder)
 
 
-mapOrder = [4, 5, 7, 10, 11, 12]
-random.shuffle(mapOrder)
+mapOrder = [10, 5, 7, 10, 11, 12]
+# random.shuffle(mapOrder)
 # mapOrder = [10, 10, 10, 10, 10, 10]
 mapOrder = [0, 2, 3, 6] + mapOrder
 print("mapOrder", mapOrder)
@@ -932,9 +928,6 @@ class Driver:
 
             robot_action = env.get_robot_action(env.world_state[:6], robot_action_type)
             robot_action_node = solver.root_action_node.robot_node_children[robot_action[0]]
-
-            if debug_tree:
-                visualize_tree(solver.root_action_node)
 
             if robot_action_node == "empty":
                 # We're not adding to the tree though here

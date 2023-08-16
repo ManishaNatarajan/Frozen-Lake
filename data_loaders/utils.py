@@ -208,12 +208,12 @@ def extract_episode_data(filename, map_ids=(4, 5, 6, 7, 8, 9, 10, 11, 12, 13)):
         robot_actions = convert_robot_actions(robot_type, robot_actions)  # Convert robot actions to 0,1,2,3,4 (based on intervention type)
         last_human_actions = map_data["last_human_action"].to_numpy()
         human_actions = map_data["current_human_action"].to_numpy()
-        # human_actions = convert_human_actions(last_human_actions=last_human_actions,
-        #                                       current_human_actions=human_actions,
-        #                                       robot_actions=robot_actions,
-        #                                       last_state=last_states,
-        #                                       current_state=curr_states)
-        human_actions = convert_human_actions_with_detect(human_actions)
+        human_actions = convert_human_actions(last_human_actions=last_human_actions,
+                                              current_human_actions=human_actions,
+                                              robot_actions=robot_actions,
+                                              last_state=last_states,
+                                              current_state=curr_states)
+        # human_actions = convert_human_actions_with_detect(human_actions)
 
         rewards = map_data["reward"].to_numpy()
         timesteps = map_data["timestep"].to_numpy()

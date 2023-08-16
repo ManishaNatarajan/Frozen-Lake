@@ -8,6 +8,7 @@ from data_loaders.BC_loader import BCDataset
 from tqdm import tqdm
 import copy
 from scipy.stats import beta
+from sklearn.model_selection import KFold
 
 
 def create_init_belief(num_particles=500):
@@ -85,6 +86,7 @@ def reinvigorate_particles(particle_set, min_particles=100):
         # Create duplicate particles to reach min particles
         if len(particle_set) == 0:
             print("Error: Belief is empty!!!")
+            return create_init_belief(min_particles)
         while len(particle_set) < min_particles:
             p = np.random.choice(np.arange(len(particle_set)))
             new_particle = copy.deepcopy(particle_set[p])
@@ -137,50 +139,66 @@ if __name__ == '__main__':
     use_actions = True
 
     # Load test dataset
-    test_path = "data/User_Study_1/RL_data/val/"
-    test_dataset = BCDataset(folder_path=test_path, sequence_length=seq_len, use_actions=use_actions)
+    train_val_path = "data/User_Study_1/RL_data/train_val/"
 
-    _, all_robot_actions = np.where(test_dataset.robot_actions == 1)
+    # Use k-fold cross validation
+    kf = KFold(n_splits=5)
 
-    belief = create_init_belief(num_particles=500)
+    # get list of all files:
+    import glob
 
-    CE_loss = []
-    accuracy = 0
-    pred_counts = np.zeros((3,))
-    true_counts = np.zeros((3,))
+    all_files = glob.glob(train_val_path + "*.csv")
 
-    # Sensitivity analysis: How accurate is the model in predicting each human action type
-    sensitivity = np.zeros((3,))
+    for fold, (train_idx, test_idx) in enumerate(kf.split(all_files)):
+        print('Fold: {}, Test Idx: {}'.format(fold, test_idx))
+        test_files = [all_files[t] for t in test_idx]
 
-    # Go through the dataset sequentially (i.e., one step at a time)
-    # TODO: Need to reset particles for each user
-    for i in tqdm(range(len(test_dataset))):
-        _, current_human_action = test_dataset[i]
-        current_human_action = np.where(current_human_action == 1)[0][0]
-        current_robot_action = all_robot_actions[i]
+        test_dataset = BCDataset(folder_path=test_files, sequence_length=seq_len, use_actions=use_actions,
+                                 num_human_actions=num_human_actions)
 
-        belief, counts = belief_update(belief, curr_robot_action=current_robot_action,
-                                       curr_human_action=current_human_action)
+        _, all_robot_actions = np.where(test_dataset.robot_actions == 1)
 
-        model_prediction_probs = counts/np.sum(counts)
-        true_val = np.eye(num_human_actions)[current_human_action]
-        predicted_val = np.random.choice(np.arange(num_human_actions), p=model_prediction_probs)
-        # belief = reinvigorate_particles(belief, min_particles=400)
-        belief = max_entropy_reinvigorate_particles(belief, min_particles=500)
+        belief = create_init_belief(num_particles=500)
 
-        # Get stats
-        accuracy += current_human_action == predicted_val
-        if current_human_action == predicted_val:
-            sensitivity[current_human_action] += 1
-        # print(predicted_val, current_human_action)
-        CE_loss.append(-np.sum(true_val * model_prediction_probs))
-        pred_counts[predicted_val] += 1
-        true_counts[current_human_action] += 1
+        CE_loss = []
+        accuracy = 0
+        pred_counts = np.zeros((3,))
+        true_counts = np.zeros((3,))
 
-    print("accuracy: {}".format(accuracy / len(test_dataset)))
-    print("Counts: {}".format(pred_counts))
-    print("True Counts: {}".format(true_counts))
-    print("Sensitivity: {}".format(sensitivity/true_counts))
-    print("Avg Sensitivity: {}".format(np.mean(sensitivity/true_counts)))
+        # Sensitivity analysis: How accurate is the model in predicting each human action type
+        sensitivity = np.zeros((3,))
+
+        # Go through the dataset sequentially (i.e., one step at a time)
+        # TODO: Need to reset particles for each user
+        for i in tqdm(range(len(test_dataset))):
+            _, current_human_action = test_dataset[i]
+            current_human_action = np.where(current_human_action == 1)[0][0]
+            current_robot_action = all_robot_actions[i]
+
+            belief, counts = belief_update(belief, curr_robot_action=current_robot_action,
+                                           curr_human_action=current_human_action)
+
+            model_prediction_probs = counts/np.sum(counts)
+            true_val = np.eye(num_human_actions)[current_human_action]
+            predicted_val = np.random.choice(np.arange(num_human_actions), p=model_prediction_probs)
+            belief = reinvigorate_particles(belief, min_particles=400)
+            # belief = max_entropy_reinvigorate_particles(belief, min_particles=500)
+
+            # Get stats
+            accuracy += current_human_action == predicted_val
+            if current_human_action == predicted_val:
+                sensitivity[current_human_action] += 1
+            # print(predicted_val, current_human_action)
+            CE_loss.append(-np.sum(true_val * model_prediction_probs))
+            pred_counts[predicted_val] += 1
+            true_counts[current_human_action] += 1
+
+        print("accuracy: {}".format(accuracy / len(test_dataset)))
+        print("Counts: {}".format(pred_counts))
+        print("True Counts: {}".format(true_counts))
+        print("Sensitivity: {}".format(sensitivity/true_counts))
+        print("Avg Sensitivity: {}".format(np.mean(sensitivity/true_counts)))
+
+        print('-------------------------------------------------------------------------------------------------------')
 
 
