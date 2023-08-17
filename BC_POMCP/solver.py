@@ -146,7 +146,7 @@ class POMCPSolver:
             robot_action_type = action_node.optimal_robot_action(self.c)
         # robot_action_type = 0
         robot_action = self.env.get_robot_action(world_state, robot_assistance_mode=robot_action_type)
-        robot_action_node = action_node.robot_node_children[robot_action_type]
+        robot_action_node = action_node.robot_node_children[robot_action[0]]
 
         second_augmented_state = self.env.augmented_state_transition(augmented_state, robot_action, None)
 

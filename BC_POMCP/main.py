@@ -187,7 +187,9 @@ class Driver:
                 robot_action_type = 0  # Do not interrupt if the human uses detection function
             else:
                 robot_action_type = solver.search()  # One iteration of the POMCP search  # Here the robot action indicates the type of assistance
-            robot_action_node = solver.root_action_node.robot_node_children[robot_action_type]
+
+            robot_action = env.get_robot_action(env.world_state[:6], robot_action_type)
+            robot_action_node = solver.root_action_node.robot_node_children[robot_action[0]]
 
             if debug_tree:
                 visualize_tree(solver.root_action_node)
@@ -197,7 +199,7 @@ class Driver:
                 # It doesn't matter because we are going to update the root from h to hao
                 robot_action_node = RobotActionNode(env)
 
-            robot_action = env.get_robot_action(env.world_state[:6], robot_action_type)
+
             # print("Robot Action: ", robot_action)
 
             # Update the environment
