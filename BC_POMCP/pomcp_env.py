@@ -449,11 +449,11 @@ class FrozenLakeEnv:
             human_direction = human_action[2]
             if human_detect: # Use detection function
                 self.s = s = position
+                detected_s = self.move(position, human_direction)
                 next_human_slippery = {i for i in human_slippery}
                 next_robot_slippery = {i for i in robot_slippery}
                 next_human_err = {i for i in human_err}
                 next_robot_err = {i for i in robot_err}
-                detected_s = self.move(position, human_direction)
                 row = detected_s // self.ncol
                 col = detected_s % self.ncol
                 if self.desc[row, col] in b'S':
@@ -492,16 +492,17 @@ class FrozenLakeEnv:
             elif robot_type == CONDITION['control'] or robot_type == CONDITION['control_w_explain']:
                 s = self.move(last_position, robot_direction)
                 self.s = s
+                next_human_slippery = {i for i in human_slippery}
+                next_robot_slippery = {i for i in robot_slippery}
+                next_human_err = {i for i in human_err}
+                next_robot_err = {i for i in robot_err}
                 if self.desc[s // self.ncol, s % self.ncol] in b'HS':  # if human falls into a hole, restart
                     self.s = 0
                     self.interrupted = 0
                     self.truncated = True
                     self.last_interrupt = [None, None]
                     # Remove the error and show the ground truth
-                    next_human_slippery = {i for i in human_slippery}
-                    next_robot_slippery = {i for i in robot_slippery}
-                    next_human_err = {i for i in human_err}
-                    next_robot_err = {i for i in robot_err}
+
                     if (s // self.ncol, s % self.ncol) not in human_slippery:
                         next_human_slippery.add((s // self.ncol, s % self.ncol))
                         if (s // self.ncol, s % self.ncol) in self.human_err:
@@ -512,11 +513,26 @@ class FrozenLakeEnv:
                             next_robot_err.add((s // self.ncol, s % self.ncol))
                     return 0, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
                 next_human_slippery, next_robot_slippery = self.detect_slippery_region(s, human_slippery, robot_slippery, human_err, robot_err)
-                return s, next_human_slippery, next_robot_slippery, human_err, robot_err
+                # Remove the false slippery regions after passing it
+                if self.desc[s // self.ncol, s % self.ncol] in b'F' and (
+                        s // self.ncol, s % self.ncol) in human_slippery:
+                    next_human_slippery.remove((s // self.ncol, s % self.ncol))
+                    if (s // self.ncol, s % self.ncol) in self.human_err:
+                        next_human_err.add((s // self.ncol, s % self.ncol))
+                if self.desc[s // self.ncol, s % self.ncol] in b'F' and (
+                        s // self.ncol, s % self.ncol) in robot_slippery:
+                    next_robot_slippery.remove((s // self.ncol, s % self.ncol))
+                    if (s // self.ncol, s % self.ncol) in self.robot_err:
+                        next_robot_err.add((s // self.ncol, s % self.ncol))
+                return s, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
 
             else:
                 curr_row = position // self.ncol
                 curr_col = position % self.ncol
+                next_human_slippery = {i for i in human_slippery}
+                next_robot_slippery = {i for i in robot_slippery}
+                next_human_err = {i for i in human_err}
+                next_robot_err = {i for i in robot_err}
                 if robot_type == CONDITION['no_interrupt'] and self.desc[
                     curr_row, curr_col] in b'HS':  # if human falls into a hole, restart
                     self.s = 0
@@ -537,7 +553,21 @@ class FrozenLakeEnv:
                             next_robot_err.add((curr_row, curr_col))
                     return 0, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
                 self.s = position
-                return position, human_slippery, robot_slippery, human_err, robot_err
+                next_human_slippery, next_robot_slippery = self.detect_slippery_region(position, human_slippery,
+                                                                                       robot_slippery, human_err,
+                                                                                       robot_err)
+                # Remove the false slippery regions after passing it
+                if self.desc[curr_row, curr_col] in b'F' and (
+                        curr_row, curr_col) in human_slippery:
+                    next_human_slippery.remove((curr_row, curr_col))
+                    if (curr_row, curr_col) in self.human_err:
+                        next_human_err.add((curr_row, curr_col))
+                if self.desc[curr_row, curr_col] in b'F' and (
+                        curr_row, curr_col) in robot_slippery:
+                    next_robot_slippery.remove((curr_row, curr_col))
+                    if (curr_row, curr_col) in self.robot_err:
+                        next_robot_err.add((curr_row, curr_col))
+                return position, next_human_slippery, next_robot_slippery, next_human_err, next_robot_err
 
     def get_BC_observation(self, current_augmented_state, robot_action):
         # current_human_trust = current_augmented_state[self.num_states]
@@ -773,19 +803,28 @@ class FrozenLakeEnv:
         position, last_position = augmented_state[0][-1], augmented_state[0][-2]
         # Get reward based on the optimality of the human action and the turn number
         # TODO: add penalty if robot takes control etc.
-        curr_col = position // self.ncol
-        curr_row = position % self.ncol
-        last_col = last_position // self.ncol
-        last_row = last_position % self.ncol
+        curr_row = position // self.ncol
+        curr_col = position % self.ncol
+        last_row = last_position // self.ncol
+        last_col = last_position % self.ncol
+        if human_action[1] - 2 >= 0:
+            undo_action = human_action[1] - 2
+        else:
+            undo_action = human_action[1] + 2
+        actual_state = self.move(self.world_state[1], undo_action)
         reward = -1
         detect = None
         if human_action:
             human_accept, detect, human_choice = human_action
         if detect == 1:
             reward = -2
-        if self.desc[curr_col, curr_row] in b'HS' or (self.desc[last_col, last_row] in b'HS' and robot_action[0] == 0):
+        # we will only call this function after robot action
+        if self.desc[curr_row, curr_col] in b'HS' or \
+                (self.desc[last_row, last_col] in b'HS' and position == 0 and self.move(actual_state,
+                                                                                        robot_action[1]) != 0) or \
+                (self.desc[last_row, last_col] in b'HS' and robot_action[0] == 0):
             reward = -10
-        elif self.desc[curr_col, curr_row] in b'G':
+        elif self.desc[curr_row, curr_col] in b'G':
             reward = 30
             print("*******************************GOAL*******************************************")
         return reward
@@ -837,13 +876,54 @@ class FrozenLakeEnv:
             shortest_path = find_shortest_path(self.desc, robot_slippery, s_previous, self.ncol)
             if len(shortest_path) < 2:
                 # self.robot_action = self.get_next_action(s_previous, last_human_action)
-                return 0, None
+                # return 0, None
+                actions = [RIGHT, DOWN, LEFT, UP]
+                actions.remove(last_human_action)
+                robot_action = actions.pop()
+                next_s = self.move(s_previous, robot_action)
+                # while len(actions) > 0 and (self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                while len(actions) > 0 and (
+                        self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                    # if self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS':
+                    #     print("In danger", next_s)
+                    # if next_s == s_previous:
+                    #     print("Doesn't move")
+                    robot_action = actions.pop()
+                    next_s = self.move(s_previous, robot_action)
+                    # if len(actions) == 0 and (
+                    #         self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                    #     # robot_action = best_action
+                    #     return 0, None
             else:
                 best_action = shortest_path[1][1]
                 # if best_action == last_human_action:
                 #     self.robot_action = self.get_next_action(s_previous, last_human_action)
                 # else:
-                self.robot_action = best_action
+                robot_action = best_action
+                next_s = self.move(s_previous, best_action)
+                # Choose another action if the best action will lead to failure
+                actions = [RIGHT, DOWN, LEFT, UP]
+                actions.remove(best_action)
+                if last_human_action in actions:
+                    actions.remove(last_human_action)
+                # while len(actions) > 0 and (self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                while len(actions) > 0 and (
+                        self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                    # if self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS':
+                    #     print("In danger", next_s)
+                    # if next_s == s_previous:
+                    #     print("Doesn't move")
+                    robot_action = actions.pop()
+                    next_s = self.move(s_previous, robot_action)
+                    if len(actions) == 0 and (
+                            self.desc[next_s // self.ncol, next_s % self.ncol] in b'HS' or next_s == s_previous):
+                        # robot_action = best_action
+                        return 0, None
+                        # print("No action")
+                if robot_action == last_human_action:
+                    return 0, None
+
+
             # if self.robot_map[curr_row, curr_col] == b'S':
             self.interrupted = 1
             if self.desc[curr_row, curr_col] == b"H":
@@ -871,7 +951,7 @@ class FrozenLakeEnv:
         self.s = 0
         self.visited_slippery_region = []
         self.score = 0
-        next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole}, {i for i in (self.hole+self.slippery)}, (), ())
+        next_human_slippery, next_robot_slippery = self.detect_slippery_region(0, {i for i in self.hole}, {i for i in self.hole}, (), ())
         self.world_state = [[0, 0, 0, 0], next_human_slippery, next_robot_slippery, set(), set()]
         self.num_states = len(self.world_state)
 
