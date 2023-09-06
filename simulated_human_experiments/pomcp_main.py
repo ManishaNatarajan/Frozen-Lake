@@ -220,7 +220,7 @@ class Driver:
             all_states.append(env.world_state[0])
             # print("World state after robot action: ", env.world_state)
             # print("Robot map")
-            # env.render(env.desc)
+            env.render(env.desc)
 
             # We finally use the real observation / human action (i.e., from the simulated human model)
 
@@ -261,7 +261,7 @@ class Driver:
             print("Human action: ", human_action)
             # print("World state after human action: ", env.world_state)
             # print("Human map")
-            # env.render(env.desc)
+            env.render(env.desc)
 
             robot_actions.append(robot_action)
             human_actions.append(human_action)
@@ -345,7 +345,7 @@ if __name__ == '__main__':
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[0],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type="epsilon_greedy")
@@ -364,7 +364,7 @@ if __name__ == '__main__':
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
+            simulated_human = SimulatedHuman(env, true_trust=true_trust[0],
                                              true_capability=true_capability,
                                              type="epsilon_greedy")
 

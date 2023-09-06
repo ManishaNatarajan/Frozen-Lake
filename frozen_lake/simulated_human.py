@@ -2,7 +2,7 @@
 import random as rand
 import operator
 import os
-
+from queue import Queue
 from frozen_lake.frozen_lake_env import *
 
 
@@ -31,6 +31,9 @@ class SimulatedHuman:
         rand.seed(seed)
         np.random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
+        self.detected_grids = []  # Keep a list of grids that were previously detected
+        self.memory_len = 10  # Length to determine bounded memory of previously visited grids
+        self.recent_visited_grids = []
 
     def simulateHumanAction(self, world_state, robot_action):
         """
@@ -51,7 +54,9 @@ class SimulatedHuman:
         robot_direction = robot_action[1]
         true_human_trust = self.true_human_trust
         true_human_capability = self.true_human_capability
-        human_acceptance_probability = (np.array(true_human_trust) / np.sum(true_human_trust))[0]
+
+        human_acceptance_probability = np.random.beta(true_human_trust[0], true_human_trust[1])
+        # human_acceptance_probability = (np.array(true_human_trust) / np.sum(true_human_trust))[0]
 
         # For actions with explanation, increase the human acceptance probability
         if robot_assist_type in [3, 4]:
@@ -132,12 +137,14 @@ class SimulatedHuman:
         # if rand() < epsilon, then choose suboptimal action, otherwise choose the ground truth optimal action.
         elif self.type == "epsilon_greedy":
             epsilon = 0.2
+
             if robot_assist_type == 0:
                 # No assistance
                 # human_choice = np.random.choice(4)
                 accept = 0
                 if human_acceptance_probability <= prob < 0.5 + 0.5*human_acceptance_probability:
                     detect = 1
+
             elif robot_assist_type == 1 or robot_assist_type == 3: #Interrupt
                 # print(self.env.lastaction)
                 # User either chooses the robot's suggestion or their own based on their trust in the robot and their capablity
@@ -186,6 +193,8 @@ class SimulatedHuman:
                         else:
                             actions = [robot_direction + 2]
 
+            # Determine direction of human action (TODO: Fix epsilon-greedy policy to mostly choose from the human knowledge)
+
             shortest_path = self.env.find_shortest_path(self.env.desc, human_slippery, current_position, self.env.ncol)
 
             e = np.random.uniform()
@@ -216,5 +225,47 @@ class SimulatedHuman:
                         s = self.env.move(current_position, human_choice)
             else: # Choose optimal action
                 human_choice = true_best_action
+
+            # Check if the action is detect whether we've already previously detected the state.
+            if detect == 1:
+                s = self.env.move(current_position, human_choice)
+                if s == 63:
+                    # Reached goal
+                    accept = 0 if robot_assist_type == 0 else 2
+                    detect = 0  # Do not detect goal
+
+                elif s not in self.detected_grids:
+                    self.detected_grids.append(s)  # append to the list of detected grids
+                else:
+                    curr_row = s // self.env.ncol
+                    curr_col = s % self.env.ncol
+                    while s in self.detected_grids or s in self.recent_visited_grids\
+                            or self.env.desc[curr_row][curr_col] == b'H'\
+                            or self.env.desc[curr_row][curr_col] == b'G':
+                        actions.remove(human_choice)
+                        if len(actions) == 0:
+                            # Need to check still if this action is not leading to a hole...
+                            while self.env.desc[curr_row][curr_col] == b'H':
+                                human_choice = np.random.choice(np.arange(4))
+                                s = self.env.move(current_position, human_choice)
+                                curr_row = s // self.env.ncol
+                                curr_col = s % self.env.ncol
+                            accept = 0 if robot_assist_type == 0 else 2
+                            detect = 0  # Do not detect as there's no feasible direction
+                            break
+                        human_choice = np.random.choice(actions)
+                        s = self.env.move(current_position, human_choice)
+                        curr_row = s // self.env.ncol
+                        curr_col = s % self.env.ncol
+
+                if detect == 1 and s not in self.detected_grids:  # Need to check again after exiting the while loop
+                    self.detected_grids.append(s)
+
+            else:
+                s = self.env.move(current_position, human_choice)
+                while len(self.recent_visited_grids) >= self.memory_len:
+                    self.recent_visited_grids.pop(0)  # Remove the oldest grid visited
+                if s not in self.recent_visited_grids:
+                    self.recent_visited_grids.append(s)  # Only append if not in recent visits
 
         return accept, detect, human_choice
