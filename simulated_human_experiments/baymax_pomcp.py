@@ -94,20 +94,20 @@ class Driver:
             predicted_action = get_user_action_from_beta(solution, robot_action)
             prediction_accuracy = distance_from_true_action(human_action, predicted_action)
 
-            fitness_val = prediction_accuracy + 0.5 * get_entropy(solution)
+            fitness_val = prediction_accuracy + 0.25 * get_entropy(solution)
             return fitness_val
 
         fitness_function = fitness_func
 
         num_generations = 100
-        num_parents_mating = 5
+        num_parents_mating = 10
 
-        sol_per_pop = 5
+        sol_per_pop = 50
         num_genes = 2
 
-        # To initialize population
-        init_range_low = -2
-        init_range_high = 5
+        # To initialize population (beta values have to be positive)
+        init_range_low = 0.1
+        init_range_high = 10
 
         parent_selection_type = "sss"
         keep_parents = 1
