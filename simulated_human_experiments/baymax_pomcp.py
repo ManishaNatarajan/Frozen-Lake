@@ -13,6 +13,8 @@ from frozen_lake.simulated_human import *
 from utils import *
 import time
 from visualize_rollouts import view_rollout
+from simulated_human_experiments.utils import *
+import pygad
 
 
 class Driver:
@@ -30,20 +32,20 @@ class Driver:
         self.solver = solver
         self.num_steps = num_steps
         self.simulated_human = simulated_human
+        self.num_world_states = len(self.env.world_state)
+        self.num_total_states = self.num_world_states + 2  # Should change this to 1, as we are not looking at capability
 
     def invigorate_belief(self, current_human_action_node, parent_human_action_node, robot_action, human_action, env):
         """
         Invigorates the belief space when a new human action node is created
         Updates the belief to match the world state, whenever a new human action node is created
-        :param current_human_action_node:
-        :param parent_human_action_node:
-        :param robot_action:
-        :param human_action:
-        :param env:
+        :param current_human_action_node: Current human action node is the hao node.
+        :param parent_human_action_node: Parent human action node is the h node (root of the current search tree).
+        :param robot_action: Robot action (a) taken after parent node state
+        :param human_action: Human action (o) in response to robot action
+        :param env: gym env object to determine current world state of the Frozen Lake
         :return:
         """
-        # Parent human action node is the h node (root of the current search tree).
-        # Current human action node is the hao node.
 
         for belief_state in parent_human_action_node.belief:
             # Update the belief world state for the current human action node
@@ -61,7 +63,6 @@ class Driver:
     def updateBeliefWorldState(self, human_action_node, env):
         """
         Updates the world state in the belief if there are any discrepancies...
-        # TODO: Not sure if I need this... In their POMCP code, I don't think they use this ...
         :param human_action_node:
         :param env:
         :return:
@@ -70,56 +71,104 @@ class Driver:
             print("Node belief is empty!!!")
             return
         # Update the belief (i.e., all particles) in the current node to match the current world state
-        if (human_action_node.belief[0][0] != env.world_state[0]) and (
-                human_action_node.belief[0][1] != env.world_state[1]) and \
-                (human_action_node.belief[0][2] != env.world_state[2]) and (
-                human_action_node.belief[0][3] != env.world_state[3]) and \
-                (human_action_node.belief[0][4] != env.world_state[4]) and (
-                human_action_node.belief[0][5] != env.world_state[5]):
+        if human_action_node.belief[0][:self.num_world_states] != env.world_state:
             human_action_node.belief = [[env.world_state[0], env.world_state[1], env.world_state[2], env.world_state[3],
                                          env.world_state[4], env.world_state[5], belief[6], belief[7]] for belief in
                                         human_action_node.belief]
 
-    def updateBeliefChiH(self, human_action_node, human_action):
+    def updateBeliefTrust(self, human_action_node, human_action, robot_action=(0,None)):
         """
-        Updates the human capability in belief based on the human's action
-        TODO: In their work, they update the chi_h_belief matrix based on whether the human demonstrates a failure as they have access to the decision outcome in each turn.
-        I can either only update the capability after the end of each round based on the number of errors they made
-        or assume that there is an oracle telling the robot how well the human is doing in each
-        action. I need to figure out how to update the robot's belief of human capability based on the human action.
-        I might also need to take the state information into consideration
+        Updates belief of human trust based on true user's action
+        TODO: I feel like this is a redundant update (but this was in the code for the user study...)
         :param human_action_node:
         :param human_action:
         :return:
         """
-        # TODO: I am currently updating the human capability after every turn (assuming that the robot has access
-        #  to an oracle that determines the optimality of the user's suggestion after every turn).
+        # BayMax Update
+        # Here, I use the same update as in the augmented_state_transition function in the env for updating the belief
+        # about user trust
 
-        # Here, I use the same update as in the augmented_state_transition function in the env.
-        # In the original code, they only update in case of failure here with the actual human action,
-        # whereas in the env they use intended human action for the update and update both in the case of success and failure.
-        # It makes sense here that they only use the actual human action (which is the observation).
+        # ------------------------------------ Define GA parameters ----------------------------------------------- #
+        def fitness_func(ga_instance, solution, solution_idx):
+            # Fitness function is a combination of the predicted accuracy, and entropy of the distribution
+            predicted_action = get_user_action_from_beta(solution, robot_action)
+            prediction_accuracy = distance_from_true_action(human_action, predicted_action)
+
+            fitness_val = prediction_accuracy + 0.5 * get_entropy(solution)
+            return fitness_val
+
+        fitness_function = fitness_func
+
+        num_generations = 100
+        num_parents_mating = 5
+
+        sol_per_pop = 5
+        num_genes = 2
+
+        # To initialize population
+        init_range_low = -2
+        init_range_high = 5
+
+        parent_selection_type = "sss"
+        keep_parents = 1
+
+        crossover_type = "single_point"
+
+        mutation_type = "random"
+        mutation_percent_genes = 50
+
+        ga_instance = pygad.GA(num_generations=num_generations,
+                               num_parents_mating=num_parents_mating,
+                               fitness_func=fitness_function,
+                               sol_per_pop=sol_per_pop,
+                               num_genes=num_genes,
+                               init_range_low=init_range_low,
+                               init_range_high=init_range_high,
+                               parent_selection_type=parent_selection_type,
+                               keep_parents=keep_parents,
+                               crossover_type=crossover_type,
+                               mutation_type=mutation_type,
+                               mutation_probability=0,
+                               mutation_percent_genes=mutation_percent_genes,
+                               random_seed=SEED)
+
+        # Use the current set of particles as the initial population for the Genetic Algorithm
+        particle_set = []
+        for belief in human_action_node.belief:
+            particle_set.append(belief[self.num_world_states])
+
+        ga_instance.initial_population = np.array(particle_set)  # Must be a numpy array
+
+        # Run the genetic algorithm to get the next gen particles
+        ga_instance.run()
+
+        # Update particles in node belief
+        new_particle_set = list(ga_instance.population)  # convert back to list
+        # prediction_counts = prediction_counts_after_belief_update(new_particle_set, robot_action)
 
         human_accept, detect, human_choice_idx = human_action  # human accept: 0:no-assist, 1:accept, 2:reject
 
-        for belief in human_action_node.belief:
+
+        #  World state should be the same for all particles
+        world_state = human_action_node.belief[0]
+        updated_belief = []
+        for i, p in enumerate(new_particle_set):
+            updated_belief.append(copy.deepcopy(world_state))
+            updated_belief[i][self.num_world_states] = list(p)
             if human_accept != 0:  # In case of robot assistance
                 # Update trust
-                belief[6][human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
+                updated_belief[i][self.num_world_states][human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
+
+        human_action_node.belief = updated_belief
 
     def updateRootCapabilitiesBelief(self, root_node, current_node):
         """
         Updates the root belief about capabilities to the capabilities of the current node.
-        TODO: In the tree search, we keep updating the root based on the observation history (basically we truncate the part
-        of the tree, before that... Are we updating the belief of that root node to match the capabilities??
-        I'm not too sure what this function is doing yet but I know they're using particle filter to reprsent the belief
-
         :param root_node:
         :param current_node:
         :return:
         """
-        initial_world_state = copy.deepcopy(
-            self.env.world_state)  # TODO: Ensure you reset the env. with the correct answer for the next round.
+        initial_world_state = copy.deepcopy(self.env.world_state)
         root_node.belief = []
         num_samples = 10000
         # Sample belief_trust and belief_capability from a distribution
@@ -130,39 +179,12 @@ class Driver:
                                   current_node_belief[6], current_node_belief[7]] for current_node_belief in
                                  sampled_beliefs])
 
-    def finalCapabilityCalibrationScores(self, human_action_node):
-        """
-        Returns the average capability calibration scores from particles sampled from the input human action node
-          TODO: Not sure if we need this... --> Not using this for now
-          :param human_action_node: the human action node from which particles are sampled to be evaluated
-          :return: expected robot capability calibration score, human capability calibration score
-        """
-        num_samples = 10000
-        sampled_beliefs = random.sample(human_action_node.belief, num_samples) if len(
-            human_action_node.belief) > num_samples else human_action_node.belief
-
-        total_robot_capability_score = 0
-        total_human_capability_score = 0
-        for belief in sampled_beliefs:
-            total_robot_capability_score += self.env.robotCapabilityCalibrationScore(
-                belief)  # TODO: Need to implement this in env --> Not using this for now
-            total_human_capability_score += self.env.humanCapabilityCalibrationScore(
-                belief)  # TODO: Need to implement this in env --> Not using this for now
-
-        return total_robot_capability_score / len(sampled_beliefs), total_human_capability_score / len(sampled_beliefs)
-
-    def beliefRewardScore(self, belief):
-        """
-        Returns the reward belief score for the current belief
-        :param belief:
-        :return:
-        """
-        raise NotImplementedError
-
-    def execute(self, round_num, debug_tree=False):
+    def execute(self, round_num, render_game_states=False, debug_tree=False):
         """
         Executes one round of search with the POMCP policy
         :param round_num: (type: int) the round number of the current execution
+        :param render_game_states: (type: bool) to render the game state in the terminal for debugging
+        :param debug_tree: (type: bool) to visualize the POMCP search tree after every iteration for debugging
         :return: (type: float) final reward from the environment
         """
         robot_actions = []
@@ -178,25 +200,25 @@ class Driver:
         final_env_reward = 0
 
         # Initial human action
-        robot_action = (0, None)  # No interruption
-        init_human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-        last_human_action = init_human_action
-        # init_human_action = (0, 2)
-        print("Human Initial Action: ", init_human_action)
+        robot_action = (0, None)  # No interruption (default assumption since human takes the first action)
+        human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
 
-        # Here we are adding to the tree as this will become the root for the search in the next turn
+        print("Human Initial Action: ", human_action)
+
+        # Here we are adding to the tree as this will become the root for the search
         human_action_node = HumanActionNode(env)
-        # This is where we call invigorate belief... When we add a new human action node to the tree
-        self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, init_human_action, env)
+        # We call the invigorate belief whenever we add a new human action node to the tree
+        self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
         solver.root_action_node = human_action_node
-        env.world_state = env.world_state_transition(env.world_state, robot_action, init_human_action)
+        env.world_state = env.world_state_transition(env.world_state, robot_action, human_action)
         all_states.append(env.world_state[0])
-        final_env_reward += env.reward(env.world_state, (0, None), init_human_action)
-        human_actions.append(init_human_action)
+        final_env_reward += env.reward(env.world_state, (0, None), human_action)
+        human_actions.append(human_action)
 
         for step in range(self.num_steps):
             t = time.time()
-            if last_human_action[1] == 1:
+            # Do not intervene if user is using the detection sensor
+            if human_action[1] == 1:
                 robot_action_type = 0
             else:
                 robot_action_type = solver.search()  # One iteration of the POMCP search  # Here the robot action indicates the type of assistance
@@ -218,16 +240,14 @@ class Driver:
             robot_action_node.position = env.world_state[0]
 
             all_states.append(env.world_state[0])
-            # print("World state after robot action: ", env.world_state)
-            # print("Robot map")
-            # env.render(env.desc)
+            if render_game_states:
+                env.render(env.desc)
 
             # We finally use the real observation / human action (i.e., from the simulated human model)
 
             # Note here that it is not the augmented state
             # (the latent parameters are already defined in the SimulatedHuman model I think)
             human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-            last_human_action = human_action
             human_action_node = robot_action_node.human_node_children[human_action[1] * 4 + human_action[2]]
 
             final_env_reward += env.reward(env.world_state, robot_action, human_action)
@@ -241,39 +261,32 @@ class Driver:
                 # Here we are adding to the tree as this will become the root for the search in the next turn
                 human_action_node = robot_action_node.human_node_children[
                     human_action[1] * 4 + human_action[2]] = HumanActionNode(env)
-                # This is where we call invigorate belief... When we add a new human action node to the tree
+                # We call the invigorate belief whenever we add a new human action node to the tree
                 self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
 
             # Update the environment
             solver.root_action_node = human_action_node  # Update the root node from h to hao
             env.world_state = env.world_state_transition(env.world_state, robot_action, human_action)
             # all_states.append(env.world_state[0])
+            
             # Updates the world state in the belief to match the actual world state
-            # The original POMCP implementation in this codebase does not do this...
             # Technically if all the belief updates are performed correctly, then there's no need for this.
             self.updateBeliefWorldState(human_action_node, env)
 
-            # Updates robot's belief of the human capability based on human action
+            # Updates robot's belief of human reliance based on the current human action
             # TODO: We cannot really evaluate the outcome at every turn... but I'm still updating based on choice optimality
             #  So should I only update human capability after the round is over?
             #  Should this come before root node transfer? It dm in their case
-            self.updateBeliefChiH(human_action_node, human_action)  # For now I'm updating every turn.
+            self.updateBeliefTrust(human_action_node, human_action, robot_action)  # For now I'm updating every turn.
             print("Human action: ", human_action)
-            # print("World state after human action: ", env.world_state)
-            # print("Human map")
-            # env.render(env.desc)
+
+            if render_game_states:
+                env.render(env.desc)
 
             robot_actions.append(robot_action)
             human_actions.append(human_action)
 
-            # print("Root Node Value: ", solver.root_action_node.value)
-            # print("===================================================================================================")
-
-            # # Terminates if goal is reached
-            # if env.isTerminal(env.world_state):
-            #     break
-
-            # Transfer current capabilities beliefs to the next round
+        # Transfer current capabilities beliefs to the next round
         self.updateRootCapabilitiesBelief(self.solver.root_action_node, solver.root_action_node)
 
         print("===================================================================================================")
@@ -283,10 +296,6 @@ class Driver:
         print('Robot Actions: {}'.format(robot_actions))
         print('Human Actions: {}'.format(human_actions))
         print("final world state for the round: {}".format(final_env_reward))
-
-        # TODO: Fix this and calculate from env?
-        # final_env_reward = env.final_reward([env.true_world_state, env.human_trust, env.human_capability,
-        #                                      env.human_aggressiveness])
 
         return final_env_reward, human_actions, robot_actions, all_states
 
@@ -345,7 +354,7 @@ if __name__ == '__main__':
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[0],
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[-1],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type="epsilon_greedy")
@@ -364,7 +373,7 @@ if __name__ == '__main__':
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[0],
+            simulated_human = SimulatedHuman(env, true_trust=true_trust[-1],
                                              true_capability=true_capability,
                                              type="epsilon_greedy")
 
