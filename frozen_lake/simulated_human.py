@@ -242,7 +242,8 @@ class SimulatedHuman:
                     while s in self.detected_grids or s in self.recent_visited_grids\
                             or self.env.desc[curr_row][curr_col] == b'H'\
                             or self.env.desc[curr_row][curr_col] == b'G':
-                        actions.remove(human_choice)
+                        if human_choice in actions:
+                            actions.remove(human_choice)
                         if len(actions) == 0:
                             # Need to check still if this action is not leading to a hole...
                             while self.env.desc[curr_row][curr_col] == b'H':

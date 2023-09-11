@@ -54,7 +54,7 @@ class Driver:
             # Update parent belief state to match world state (i.e., after robot action)
             belief_state = env.augmented_state_transition(belief_state, robot_action, None)
             # if belief_state[:2] == env.world_state[:2]:
-            if belief_state[:6] == env.world_state:
+            if belief_state[:self.num_world_states] == env.world_state:
                 next_augmented_state = env.augmented_state_transition(belief_state, None, human_action)
                 current_human_action_node.update_belief(next_augmented_state)
             else:

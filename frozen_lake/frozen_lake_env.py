@@ -185,11 +185,14 @@ class FrozenLakeEnv:
             c=15,
             gamma=0.99,
             seed=None,
-            human_type="random"
+            human_type="random",
+            update_belief=True
     ):
         random.seed(seed)
         np.random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
+
+        self.update_belief = update_belief  # Whether to update the beta params in augmented transition
 
         self.is_error = False
         assert (desc is not None and map_name is not None)
@@ -413,15 +416,19 @@ class FrozenLakeEnv:
         # Fixed
         next_human_capability = human_capability
 
-        if not human_action:
-            next_human_trust = human_trust  # TODO: Add noise for unseen robot actions
-        elif human_action[0] == 0:
-            # No assist condition: do not update trust
+        if not self.update_belief:
             next_human_trust = human_trust
+
         else:
-            human_accept = human_action[0]  # 1 indicates accept, 2 indicates reject
-            human_trust[human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
-            next_human_trust = human_trust
+            if not human_action:
+                next_human_trust = human_trust  # TODO: Add noise for unseen robot actions
+            elif human_action[0] == 0:
+                # No assist condition: do not update trust
+                next_human_trust = human_trust
+            else:
+                human_accept = human_action[0]  # 1 indicates accept, 2 indicates reject
+                human_trust[human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
+                next_human_trust = human_trust
 
         next_augmented_state = [next_world_state[0], next_world_state[1], next_world_state[2],
                                 next_world_state[3], next_world_state[4], next_world_state[5],
