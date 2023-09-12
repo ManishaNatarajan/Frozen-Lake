@@ -15,7 +15,18 @@ import time
 from visualize_rollouts import view_rollout
 from simulated_human_experiments.utils import *
 import pygad
+import json
+from collections import defaultdict
 
+
+def write_json(path, data, indent=4):
+    class npEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, np.int32):
+                return int(obj)
+            return json.JSONEncoder.default(self, obj)
+    with open(path, 'w') as file:
+        json.dump(data, file, indent=indent, cls=npEncoder)
 
 class Driver:
     def __init__(self, env, solver, num_steps, simulated_human):
@@ -109,8 +120,9 @@ class Driver:
         init_range_low = 0.1
         init_range_high = 10
 
-        parent_selection_type = "sss"
-        keep_parents = 1
+        parent_selection_type = "sss"  # "random", "tournament"
+        keep_parents = -1
+        keep_elitism = sol_per_pop // 5  # Keep the top K solutions in the next generation < sol_per_pop
 
         crossover_type = "single_point"
 
@@ -130,6 +142,7 @@ class Driver:
                                mutation_type=mutation_type,
                                mutation_probability=0,
                                mutation_percent_genes=mutation_percent_genes,
+                               keep_elitism=keep_elitism,
                                random_seed=SEED)
 
         # Use the current set of particles as the initial population for the Genetic Algorithm
@@ -302,7 +315,9 @@ class Driver:
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [0]:  # [0, 5, 21, 25, 42]
+    user_data = defaultdict(lambda: defaultdict())
+    # user_data["seed"] = seeds
+    for SEED in [0, 5, 21, 25, 42]:
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
@@ -354,7 +369,7 @@ if __name__ == '__main__':
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[-1],
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[6],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type="epsilon_greedy")
@@ -373,7 +388,7 @@ if __name__ == '__main__':
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[-1],
+            simulated_human = SimulatedHuman(env, true_trust=true_trust[6],
                                              true_capability=true_capability,
                                              type="epsilon_greedy")
 
@@ -405,13 +420,18 @@ if __name__ == '__main__':
                 history.append({"human_action": list(human_actions[t]),
                                 "robot_action": list(robot_actions[t])})
 
-            user_data = {"mapOrder": [map_num],
-                         str(i): {
-                             "history": history
-                            }
-                         }
+            # user_data = {"mapOrder": [map_num],
+            #              str(i): {
+            #                  "history": history
+            #                 }
+            #              }
 
-            view_rollout(user_data, rollout_idx=0)
+            # view_rollout(user_data, rollout_idx=0)
+
+            # user_data["mapOrder"] = [map_num]
+            user_data[str(SEED)] = {"history": history,
+                                    "reward": rewards,
+                                    "true_trust": true_trust[6]}
 
             all_rewards.append(rewards)
             mean_rewards.append(np.mean(rewards))
@@ -426,3 +446,4 @@ if __name__ == '__main__':
         all_rewards = np.array(all_rewards)
         # with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
         #     np.save(f, all_rewards)
+    write_json(f"logs/sim_experiments/map_{map_num}/baymax_pomcp.json", user_data)
