@@ -12,9 +12,11 @@ from frozen_lake.human_action_node import *
 from frozen_lake.simulated_human import *
 from utils import *
 import time
-from collections import defaultdict
-import json
 from visualize_rollouts import view_rollout
+from simulated_human_experiments.utils import *
+import pygad
+import json
+from collections import defaultdict
 
 
 def write_json(path, data, indent=4):
@@ -26,9 +28,8 @@ def write_json(path, data, indent=4):
     with open(path, 'w') as file:
         json.dump(data, file, indent=indent, cls=npEncoder)
 
-
 class Driver:
-    def __init__(self, env, solver, num_steps, simulated_human, update_belief=True):
+    def __init__(self, env, solver, num_steps, simulated_human):
         """
         Initializes a driver : uses particle filter to maintain belief over hidden states,
         and uses POMCP to determine the optimal robot action
@@ -37,13 +38,11 @@ class Driver:
         :param solver: (type: POMCPSolver) Instance of the POMCP Solver for the robot policy
         :param num_steps: (type: int) number of actions allowed -- I think it's the depth of search in the tree
         :param simulated_human: (type: SimulatedHuman) the simulated human model
-        :param update_belief: (type: bool) if set to True performs BA-POMCP, else it's regular POMCP
         """
         self.env = env
         self.solver = solver
         self.num_steps = num_steps
         self.simulated_human = simulated_human
-        self.update_belief = update_belief
         self.num_world_states = len(self.env.world_state)
         self.num_total_states = self.num_world_states + 2  # Should change this to 1, as we are not looking at capability
 
@@ -58,8 +57,6 @@ class Driver:
         :param env: gym env object to determine current world state of the Frozen Lake
         :return:
         """
-        # Parent human action node is the h node (root of the current search tree).
-        # Current human action node is the hao node.
 
         for belief_state in parent_human_action_node.belief:
             # Update the belief world state for the current human action node
@@ -77,7 +74,6 @@ class Driver:
     def updateBeliefWorldState(self, human_action_node, env):
         """
         Updates the world state in the belief if there are any discrepancies...
-        # TODO: Not sure if I need this... In their POMCP code, I don't think they use this ...
         :param human_action_node:
         :param env:
         :return:
@@ -85,46 +81,135 @@ class Driver:
         if len(human_action_node.belief) == 0:
             print("Node belief is empty!!!")
             return
-            # Update the belief (i.e., all particles) in the current node to match the current world state
+        # Update the belief (i.e., all particles) in the current node to match the current world state
         if human_action_node.belief[0][:self.num_world_states] != env.world_state:
             human_action_node.belief = [[env.world_state[0], env.world_state[1], env.world_state[2], env.world_state[3],
                                          env.world_state[4], env.world_state[5], belief[6], belief[7]] for belief in
                                         human_action_node.belief]
 
-    def updateBeliefTrust(self, human_action_node, human_action):
+    def updateBeliefTrust(self, human_action_node, human_action, robot_action=(0,None)):
         """
-        Updates the human capability in belief based on the human's action
-        TODO: In their work, they update the chi_h_belief matrix based on whether the human demonstrates a failure as they have access to the decision outcome in each turn.
-        I can either only update the capability after the end of each round based on the number of errors they made
-        or assume that there is an oracle telling the robot how well the human is doing in each
-        action. I need to figure out how to update the robot's belief of human capability based on the human action.
-        I might also need to take the state information into consideration
+        Updates belief of human trust based on true user's action
+        TODO: I feel like this is a redundant update (but this was in the code for the user study...)
         :param human_action_node:
         :param human_action:
         :return:
         """
-        # TODO: I am currently updating the human capability after every turn (assuming that the robot has access
-        #  to an oracle that determines the optimality of the user's suggestion after every turn).
+        # BayMax Update
+        # Here, I use the same update as in the augmented_state_transition function in the env for updating the belief
+        # about user trust
 
-        # Here, I use the same update as in the augmented_state_transition function in the env.
-        # In the original code, they only update in case of failure here with the actual human action,
-        # whereas in the env they use intended human action for the update and update both in the case of success and failure.
-        # It makes sense here that they only use the actual human action (which is the observation).
+        # ------------------------------------ Define GA parameters ----------------------------------------------- #
+        def fitness_func(ga_instance, solution, solution_idx):
+            # Fitness function is a combination of the predicted accuracy, and entropy of the distribution
+            predicted_action = get_user_action_from_beta(np.abs(solution), robot_action)
+            prediction_accuracy = distance_from_true_action(human_action, predicted_action)
+
+            fitness_val = prediction_accuracy + 0.25 * get_entropy(np.abs(solution))
+            return fitness_val
+
+        # ------------------------------ Custom / Random Mutation -------------------------------------------------- #
+        def mutation_func(offspring, ga_instance):
+            # Custom mutation function --> reduce entropy of beta parameters (by randomly reducing the count values)
+            range_low = 1.0
+            for chromosome_idx in range(offspring.shape[0]):
+                random_gene_idx = np.random.choice(range(offspring.shape[1]))
+
+                # Reduce entropy of beta parameters
+                offspring[chromosome_idx, random_gene_idx] -= np.random.uniform(0, 10)
+
+                # Cannot be below 0.1 (only positive values for beta
+                offspring[chromosome_idx, random_gene_idx] = np.maximum(range_low,
+                                                                        offspring[chromosome_idx, random_gene_idx])
+
+            return offspring
+
+
+        num_generations = 100
+        num_parents_mating = 10
+
+        sol_per_pop = 50
+        num_genes = 2
+
+        # To initialize population (beta values have to be positive)
+        init_range_low = 0.1
+        init_range_high = 10
+
+        parent_selection_type = "sss"  # "random", "tournament"
+        keep_parents = -1
+        keep_elitism = sol_per_pop // 5  # Keep the top K solutions in the next generation < sol_per_pop
+
+        crossover_type = "single_point"
+
+        mutation_type = "random"
+        mutation_percent_genes = 50
+        #
+        # ga_instance = pygad.GA(num_generations=num_generations,
+        #                        num_parents_mating=num_parents_mating,
+        #                        fitness_func=fitness_func,
+        #                        sol_per_pop=sol_per_pop,
+        #                        num_genes=num_genes,
+        #                        init_range_low=init_range_low,
+        #                        init_range_high=init_range_high,
+        #                        parent_selection_type=parent_selection_type,
+        #                        keep_parents=keep_parents,
+        #                        crossover_type=crossover_type,
+        #                        mutation_type=mutation_func,
+        #                        mutation_probability=None,
+        #                        mutation_percent_genes=mutation_percent_genes,
+        #                        keep_elitism=keep_elitism,
+        #                        random_seed=SEED)
+        # ---------------------------------------------------------------------------------------------------------- #
+
+        # ------------------------------ Adaptive Mutation --------------------------------------------------------- #
+        ga_instance = pygad.GA(num_generations=num_generations,
+                               num_parents_mating=num_parents_mating,
+                               fitness_func=fitness_func,
+                               sol_per_pop=sol_per_pop,
+                               num_genes=num_genes,
+                               init_range_low=init_range_low,
+                               init_range_high=init_range_high,
+                               parent_selection_type=parent_selection_type,
+                               keep_parents=keep_parents,
+                               crossover_type=crossover_type,
+                               mutation_type="adaptive",
+                               mutation_probability=(0.5, 0.15),
+                               keep_elitism=keep_elitism,
+                               random_seed=SEED)
+
+
+        # Use the current set of particles as the initial population for the Genetic Algorithm
+        particle_set = []
+        for belief in human_action_node.belief:
+            particle_set.append(belief[self.num_world_states])
+
+        ga_instance.initial_population = np.array(particle_set)  # Must be a numpy array
+
+        # Run the genetic algorithm to get the next gen particles
+        ga_instance.run()
+
+        # Update particles in node belief
+        new_particle_set = list(ga_instance.population)  # convert back to list
+        # prediction_counts = prediction_counts_after_belief_update(new_particle_set, robot_action)
 
         human_accept, detect, human_choice_idx = human_action  # human accept: 0:no-assist, 1:accept, 2:reject
 
-        for belief in human_action_node.belief:
+
+        #  World state should be the same for all particles
+        world_state = human_action_node.belief[0]
+        updated_belief = []
+        for i, p in enumerate(new_particle_set):
+            updated_belief.append(copy.deepcopy(world_state))
+            updated_belief[i][self.num_world_states] = list(p)
             if human_accept != 0:  # In case of robot assistance
                 # Update trust
-                belief[self.num_world_states][human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
+                updated_belief[i][self.num_world_states][human_accept - 1] += 1  # index 0 is acceptance count, index 1 is rejection count
+
+        human_action_node.belief = updated_belief
 
     def updateRootCapabilitiesBelief(self, root_node, current_node):
         """
         Updates the root belief about capabilities to the capabilities of the current node.
-        TODO: In the tree search, we keep updating the root based on the observation history (basically we truncate the part
-        of the tree, before that... Are we updating the belief of that root node to match the capabilities??
-        I'm not too sure what this function is doing yet but I know they're using particle filter to reprsent the belief
-
         :param root_node:
         :param current_node:
         :return:
@@ -144,6 +229,8 @@ class Driver:
         """
         Executes one round of search with the POMCP policy
         :param round_num: (type: int) the round number of the current execution
+        :param render_game_states: (type: bool) to render the game state in the terminal for debugging
+        :param debug_tree: (type: bool) to visualize the POMCP search tree after every iteration for debugging
         :return: (type: float) final reward from the environment
         """
         robot_actions = []
@@ -161,12 +248,12 @@ class Driver:
         # Initial human action
         robot_action = (0, None)  # No interruption (default assumption since human takes the first action)
         human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
-        # init_human_action = (0, 2)
+
         print("Human Initial Action: ", human_action)
 
-        # Here we are adding to the tree as this will become the root for the search in the next turn
+        # Here we are adding to the tree as this will become the root for the search
         human_action_node = HumanActionNode(env)
-        # This is where we call invigorate belief... When we add a new human action node to the tree
+        # We call the invigorate belief whenever we add a new human action node to the tree
         self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
         solver.root_action_node = human_action_node
         env.world_state = env.world_state_transition(env.world_state, robot_action, human_action)
@@ -176,6 +263,7 @@ class Driver:
 
         for step in range(self.num_steps):
             t = time.time()
+            # Do not intervene if user is using the detection sensor
             if human_action[1] == 1:
                 robot_action_type = 0
             else:
@@ -198,8 +286,6 @@ class Driver:
             robot_action_node.position = env.world_state[0]
 
             all_states.append(env.world_state[0])
-            # print("World state after robot action: ", env.world_state)
-            # print("Robot map")
             if render_game_states:
                 env.render(env.desc)
 
@@ -221,41 +307,32 @@ class Driver:
                 # Here we are adding to the tree as this will become the root for the search in the next turn
                 human_action_node = robot_action_node.human_node_children[
                     human_action[1] * 4 + human_action[2]] = HumanActionNode(env)
-                # This is where we call invigorate belief... When we add a new human action node to the tree
+                # We call the invigorate belief whenever we add a new human action node to the tree
                 self.invigorate_belief(human_action_node, solver.root_action_node, robot_action, human_action, env)
 
             # Update the environment
             solver.root_action_node = human_action_node  # Update the root node from h to hao
             env.world_state = env.world_state_transition(env.world_state, robot_action, human_action)
             # all_states.append(env.world_state[0])
+            
             # Updates the world state in the belief to match the actual world state
-            # The original POMCP implementation in this codebase does not do this...
             # Technically if all the belief updates are performed correctly, then there's no need for this.
             self.updateBeliefWorldState(human_action_node, env)
 
-            # Updates robot's belief of the human capability based on human action
+            # Updates robot's belief of human reliance based on the current human action
             # TODO: We cannot really evaluate the outcome at every turn... but I'm still updating based on choice optimality
             #  So should I only update human capability after the round is over?
             #  Should this come before root node transfer? It dm in their case
-            if self.update_belief:
-                self.updateBeliefTrust(human_action_node, human_action)  # For now I'm updating every turn.
+            self.updateBeliefTrust(human_action_node, human_action, robot_action)  # For now I'm updating every turn.
             print("Human action: ", human_action)
-            # print("World state after human action: ", env.world_state)
-            # print("Human map")
+
             if render_game_states:
                 env.render(env.desc)
 
             robot_actions.append(robot_action)
             human_actions.append(human_action)
 
-            # print("Root Node Value: ", solver.root_action_node.value)
-            # print("===================================================================================================")
-
-            # # Terminates if goal is reached
-            # if env.isTerminal(env.world_state):
-            #     break
-
-            # Transfer current capabilities beliefs to the next round
+        # Transfer current capabilities beliefs to the next round
         self.updateRootCapabilitiesBelief(self.solver.root_action_node, solver.root_action_node)
 
         print("===================================================================================================")
@@ -266,19 +343,14 @@ class Driver:
         print('Human Actions: {}'.format(human_actions))
         print("final world state for the round: {}".format(final_env_reward))
 
-        # TODO: Fix this and calculate from env?
-        # final_env_reward = env.final_reward([env.true_world_state, env.human_trust, env.human_capability,
-        #                                      env.human_aggressiveness])
-
         return final_env_reward, human_actions, robot_actions, all_states
 
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    seeds = [0, 5, 21, 25, 42]
     user_data = defaultdict(lambda: defaultdict())
     # user_data["seed"] = seeds
-    for SEED in [0, 5, 21, 25, 42]:  # [0, 5, 21, 25, 42]
+    for SEED in [0, 5, 21, 25, 42]:
         random.seed(SEED)
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
@@ -305,8 +377,6 @@ if __name__ == '__main__':
         num_iter = 100
         num_steps = max_steps
         initial_belief = []
-        update_belief = False  # set to true for BA-POMCP otherwise it's just regular POMCP
-        human_type = "epsilon_greedy" if update_belief else "random"
 
         # Executes num_tests of experiments
 
@@ -335,7 +405,7 @@ if __name__ == '__main__':
                                 is_slippery=False, render_mode="human", true_human_trust=true_trust[6],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
-                                human_type=human_type, update_belief=update_belief)
+                                human_type="epsilon_greedy")
 
             # Reset the environment to initialize everything correctly
             env.reset()
@@ -353,9 +423,9 @@ if __name__ == '__main__':
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
             simulated_human = SimulatedHuman(env, true_trust=true_trust[6],
                                              true_capability=true_capability,
-                                             type="epsilon_greedy")  # This does not change
+                                             type="epsilon_greedy")
 
-            driver = Driver(env, solver, num_steps, simulated_human, update_belief=update_belief)
+            driver = Driver(env, solver, num_steps, simulated_human)
 
             # Executes num_rounds of search (calibration)
             num_rounds = 1
@@ -369,28 +439,32 @@ if __name__ == '__main__':
                 rewards.append(env_reward)
                 total_env_reward += env_reward
 
-                print("===================================================================================================")
-                print("===================================================================================================")
-                print("Average environmental reward after {} rounds:{}".format(num_rounds,
-                                                                               total_env_reward / float(num_rounds)))
-                print("Num Particles: ", len(driver.solver.root_action_node.belief))
+            print("===================================================================================================")
+            print("===================================================================================================")
+            print("Average environmental reward after {} rounds:{}".format(num_rounds,
+                                                                           total_env_reward / float(num_rounds)))
+            print("Num Particles: ", len(driver.solver.root_action_node.belief))
 
-                # To visualize the rollout...
+            # To visualize the rollout...
 
-                history = []
-                print("Path: ", all_states)
-                for t in range(len(human_actions)-1):
-                    history.append({"human_action": list(human_actions[t]),
-                                    "robot_action": list(robot_actions[t])})
+            history = []
+            print("Path: ", all_states)
+            for t in range(len(human_actions)-1):
+                history.append({"human_action": list(human_actions[t]),
+                                "robot_action": list(robot_actions[t])})
 
-                # user_data["mapOrder"] = [map_num]
-                user_data[str(SEED)] = {"history": history,
-                                        "reward": rewards,
-                                        "true_trust": true_trust[6]}
-
+            # user_data = {"mapOrder": [map_num],
+            #              str(i): {
+            #                  "history": history
+            #                 }
+            #              }
 
             # view_rollout(user_data, rollout_idx=0)
 
+            # user_data["mapOrder"] = [map_num]
+            user_data[str(SEED)] = {"history": history,
+                                    "reward": rewards,
+                                    "true_trust": true_trust[6]}
 
             all_rewards.append(rewards)
             mean_rewards.append(np.mean(rewards))
@@ -405,9 +479,4 @@ if __name__ == '__main__':
         all_rewards = np.array(all_rewards)
         # with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
         #     np.save(f, all_rewards)
-
-    if update_belief:
-        write_json(f"logs/sim_experiments/map_{map_num}/ba_pomcp.json", user_data)
-    else:
-        write_json(f"logs/sim_experiments/map_{map_num}/pomcp_2.json", user_data)
-
+    write_json(f"logs/sim_experiments/map_{map_num}/transfer_belief/baymax_pomcp.json", user_data)
