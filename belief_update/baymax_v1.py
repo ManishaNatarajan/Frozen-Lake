@@ -92,11 +92,11 @@ def belief_update(particle_set, curr_robot_action, curr_human_action, get_counts
     num_generations = 100
     num_parents_mating = 5
 
-    sol_per_pop = 5
+    sol_per_pop = 50
     num_genes = 2
 
     # To initialize population
-    init_range_low = -2
+    init_range_low = 0.1
     init_range_high = 5
 
     parent_selection_type = "sss"

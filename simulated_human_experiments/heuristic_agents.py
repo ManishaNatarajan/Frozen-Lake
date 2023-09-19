@@ -82,7 +82,7 @@ def execute(round_num, num_steps, env, human_agent, robot_agent=None, render_gam
 
     final_env_reward = 0
 
-    print("Execute round {} of search".format(round_num))
+    # print("Execute round {} of search".format(round_num))
     start_time = time.time()
 
     human_action = human_agent.simulateHumanAction(env.world_state, (0, None))
@@ -130,13 +130,13 @@ def execute(round_num, num_steps, env, human_agent, robot_agent=None, render_gam
         robot_actions.append(robot_action)
         human_actions.append(human_action)
 
-    print("===================================================================================================")
-    print("Round {} completed!".format(round_num))
-    print("Time taken:")
-    print("{} seconds".format(time.time() - start_time))
-    print('Robot Actions: {}'.format(robot_actions))
-    print('Human Actions: {}'.format(human_actions))
-    print('Final Reward: {}'.format(final_env_reward))
+    # print("===================================================================================================")
+    # print("Round {} completed!".format(round_num))
+    # print("Time taken:")
+    # print("{} seconds".format(time.time() - start_time))
+    # print('Robot Actions: {}'.format(robot_actions))
+    # print('Human Actions: {}'.format(human_actions))
+    # print('Final Reward: {}'.format(final_env_reward))
 
     # Final env reward is calculated based on the true state of the tiger and what the human finally decided to do
     # The step loop terminates if the env terminates
@@ -146,52 +146,52 @@ def execute(round_num, num_steps, env, human_agent, robot_agent=None, render_gam
 
 if __name__ == '__main__':
     # Set appropriate seeds
-    for SEED in [0, 5, 21, 25, 42]:
-        random.seed(SEED)
-        np.random.seed(SEED)
-        os.environ['PYTHONHASHSEED'] = str(SEED)
 
-        # Initialize constants for setting up the environment
-        max_steps = 80
-        num_choices = 3
+    # Initialize constants for setting up the environment
+    max_steps = 80
+    num_choices = 3
 
-        # Human latent parameters (set different values for each test)
-        true_trust = [(5, 50), (10, 40), (18, 40), (24, 36), (35, 35), (40, 65), (45, 20), (45, 56),
-                      (40, 45), (99, 1)]
-        # true_trust = [(5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50)]
-        true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
-        # true_aggressiveness = (25, 25)
+    # Human latent parameters (set different values for each test)
+    true_trust = [(5, 50), (10, 40), (24, 36), (40, 45), (45, 20), (99, 1)]
+    # true_trust = [(5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50)]
+    true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
+    # true_aggressiveness = (25, 25)
 
-        # Executes num_tests of experiments
-        num_test = 1
+    # Executes num_tests of experiments
+    num_test = 6
+
+
+    # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
+    gamma = 0.99
+    c = 20  # Exploration bonus
+    beta = 0.9
+
+    e = 0.1  # For epsilon-greedy policy
+    epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
+    num_iter = 100
+    num_steps = max_steps
+    initial_belief = []
+
+    for n in range(num_test):
+        print("*********************************************************************")
+        print(f"Executing test number {n}, Trust:{true_trust[n]}......")
+        # print("*********************************************************************")
         mean_rewards = []
         std_rewards = []
         all_rewards = []
-
-        # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
-        gamma = 0.99
-        c = 20  # Exploration bonus
-        beta = 0.9
-
-        e = 0.1  # For epsilon-greedy policy
-        epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-        num_iter = 100
-        num_steps = max_steps
-        initial_belief = []
-
-        for n in range(num_test):
-            print("*********************************************************************")
-            print("Executing test number {}......".format(n))
-            print("*********************************************************************")
+        for SEED in [0, 5, 21, 25, 42]:
+            random.seed(SEED)
+            np.random.seed(SEED)
+            os.environ['PYTHONHASHSEED'] = str(SEED)
 
             # Setup Driver
-            map_num = 5
+            map_num = 12
             map = MAPS["MAP" + str(map_num)]
             foggy = FOG["MAP" + str(map_num)]
             human_err = HUMAN_ERR["MAP" + str(map_num)]
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[6],
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta,
                                 c=c, gamma=gamma, seed=SEED,
@@ -204,7 +204,7 @@ if __name__ == '__main__':
             # robot_policy = NoAssistAgent()
             robot_policy = HeuristicAgent(type=2)
 
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[6],
+            simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
                                              true_capability=true_capability,
                                              type="epsilon_greedy")  # TODO: Can test with different humans
 
@@ -212,28 +212,28 @@ if __name__ == '__main__':
             num_rounds = 1
             total_env_reward = 0
 
-            rewards = []
+
             for i in range(num_rounds):
                 # We should only change the true state of the tiger for every round (or after every termination)
                 env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
 
                 env_reward = execute(round_num=i, num_steps=max_steps, env=env,
                                      human_agent=simulated_human, robot_agent=robot_policy)
-                rewards.append(env_reward)
+                mean_rewards.append(env_reward)
                 total_env_reward += env_reward
 
-            print("===================================================================================================")
-            print("===================================================================================================")
-            print("Average environmental reward after {} rounds:{}".format(num_rounds,
-                                                                           total_env_reward / float(num_rounds)))
-            all_rewards.append(rewards)
-            mean_rewards.append(np.mean(rewards))
-            std_rewards.append(np.std(rewards))
+            # print("===================================================================================================")
+            # print("===================================================================================================")
+            # print("Average environmental reward after {} rounds:{}".format(num_rounds,
+            #                                                                total_env_reward / float(num_rounds)))
+            # all_rewards.append(rewards)
+            # mean_rewards.append(np.mean(rewards))
+            # std_rewards.append(np.std(rewards))
+        # print("===================================================================================================")
+        # print("===================================================================================================")
+        print(mean_rewards)
         print("===================================================================================================")
-        print("===================================================================================================")
-        print(mean_rewards, std_rewards)
-        print("===================================================================================================")
-        print("===================================================================================================")
+        # print("===================================================================================================")
 
         all_rewards = np.array(all_rewards)
         # with open("files/random/{}.npy".format(SEED), 'wb') as f:

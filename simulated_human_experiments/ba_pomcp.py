@@ -154,7 +154,7 @@ class Driver:
         env = copy.deepcopy(self.env)
         solver = copy.deepcopy(self.solver)
 
-        print("Execute round {} of search".format(round_num))
+        # print("Execute round {} of search".format(round_num))
         start_time = time.time()
         final_env_reward = 0
 
@@ -162,7 +162,7 @@ class Driver:
         robot_action = (0, None)  # No interruption (default assumption since human takes the first action)
         human_action = self.simulated_human.simulateHumanAction(env.world_state, robot_action)
         # init_human_action = (0, 2)
-        print("Human Initial Action: ", human_action)
+        # print("Human Initial Action: ", human_action)
 
         # Here we are adding to the tree as this will become the root for the search in the next turn
         human_action_node = HumanActionNode(env)
@@ -182,7 +182,7 @@ class Driver:
                 robot_action_type = solver.search()  # One iteration of the POMCP search  # Here the robot action indicates the type of assistance
 
             robot_action = env.get_robot_action(env.world_state[:6], robot_action_type)
-            print("Robot action: ", robot_action)
+            # print("Robot action: ", robot_action)
             robot_action_node = solver.root_action_node.robot_node_children[robot_action[0]]
 
             # if debug_tree:
@@ -214,7 +214,7 @@ class Driver:
 
             # Terminates if goal is reached
             if env.isTerminal(env.world_state):
-                print("Final reward: ", final_env_reward)
+                # print("Final reward: ", final_env_reward)
                 break
 
             if human_action_node == "empty":
@@ -239,7 +239,7 @@ class Driver:
             #  Should this come before root node transfer? It dm in their case
             if self.update_belief:
                 self.updateBeliefTrust(human_action_node, human_action)  # For now I'm updating every turn.
-            print("Human action: ", human_action)
+            # print("Human action: ", human_action)
             # print("World state after human action: ", env.world_state)
             # print("Human map")
             if render_game_states:
@@ -258,13 +258,13 @@ class Driver:
             # Transfer current capabilities beliefs to the next round
         self.updateRootCapabilitiesBelief(self.solver.root_action_node, solver.root_action_node)
 
-        print("===================================================================================================")
-        print("Round {} completed!".format(round_num))
-        print("Time taken:")
-        print("{} seconds".format(time.time() - start_time))
-        print('Robot Actions: {}'.format(robot_actions))
-        print('Human Actions: {}'.format(human_actions))
-        print("final world state for the round: {}".format(final_env_reward))
+        # print("===================================================================================================")
+        # print("Round {} completed!".format(round_num))
+        # print("Time taken:")
+        # print("{} seconds".format(time.time() - start_time))
+        # print('Robot Actions: {}'.format(robot_actions))
+        # print('Human Actions: {}'.format(human_actions))
+        # print("final world state for the round: {}".format(final_env_reward))
 
         # TODO: Fix this and calculate from env?
         # final_env_reward = env.final_reward([env.true_world_state, env.human_trust, env.human_capability,
@@ -278,46 +278,48 @@ if __name__ == '__main__':
     seeds = [0, 5, 21, 25, 42]
     user_data = defaultdict(lambda: defaultdict())
     # user_data["seed"] = seeds
-    for SEED in [0, 5, 21, 25, 42]:  # [0, 5, 21, 25, 42]
-        random.seed(SEED)
-        np.random.seed(SEED)
-        os.environ['PYTHONHASHSEED'] = str(SEED)
 
-        # Initialize constants for setting up the environment
-        max_steps = 80
-        num_choices = 3
+    # Human latent parameters (set different values for each test)
+    true_trust = [(5, 50), (10, 40), (24, 36), (40, 45), (45, 20), (99, 1)]
+    # true_trust = [(99, 1)]
+    true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
 
-        # Human latent parameters (set different values for each test)
-        true_trust = [(5, 50), (10, 40), (18, 40), (24, 36), (35, 35), (40, 65), (45, 20), (45, 56),
-                      (40, 45), (99, 1)]
-        # true_trust = [(99, 1)]
-        true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
+    # Initialize constants for setting up the environment
+    max_steps = 80
+    num_choices = 3
 
-        # The following two parameters are for human behavior. They are currently not used.
-        human_behavior = "rational"  # TODO: they use this in the observation function in the environment
-        beta = 0.9  # Boltzmann rationality parameter (for human behavior)
+    # The following two parameters are for human behavior. They are currently not used.
+    human_behavior = "rational"  # TODO: they use this in the observation function in the environment
+    beta = 0.9  # Boltzmann rationality parameter (for human behavior)
 
-        # factors for POMCP
-        gamma = 0.99  # gamma for terminating rollout based on depth in MCTS
-        c = 20  # 400  # exploration constant for UCT (taken as R_high - R_low)
-        e = 0.1  # For epsilon-greedy policy
-        epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-        num_iter = 100
-        num_steps = max_steps
-        initial_belief = []
-        update_belief = False  # set to true for BA-POMCP otherwise it's just regular POMCP
-        human_type = "epsilon_greedy" if update_belief else "random"
+    # factors for POMCP
+    gamma = 0.99  # gamma for terminating rollout based on depth in MCTS
+    c = 20  # 400  # exploration constant for UCT (taken as R_high - R_low)
+    e = 0.1  # For epsilon-greedy policy
+    epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
+    num_iter = 100
+    num_steps = max_steps
+    update_belief = False  # set to true for BA-POMCP otherwise it's just regular POMCP
+    human_type = "epsilon_greedy" if update_belief else "random"
 
-        # Executes num_tests of experiments
+    # Executes num_tests of experiments
+    num_test = 6
 
-        num_test = 1
+    for n in range(num_test):
+        print("*********************************************************************")
+        print(f"Executing test number {n}, Trust:{true_trust[n]}......")
+        print("*********************************************************************")
+
         mean_rewards = []
         std_rewards = []
         all_rewards = []
-        for n in range(num_test):
-            print("*********************************************************************")
-            print("Executing test number {}......".format(n))
-            print("*********************************************************************")
+
+        for SEED in [0, 5, 21, 25, 42]:  # [0, 5, 21, 25, 42]
+            random.seed(SEED)
+            np.random.seed(SEED)
+            os.environ['PYTHONHASHSEED'] = str(SEED)
+
+            initial_belief = []
 
             # Robot's belief of human parameters
             all_initial_belief_trust = []
@@ -325,14 +327,14 @@ if __name__ == '__main__':
                 all_initial_belief_trust.append((1, 1))
 
             # Setup Driver
-            map_num = 5
+            map_num = 12
             map = MAPS["MAP" + str(map_num)]
             foggy = FOG["MAP" + str(map_num)]
             human_err = HUMAN_ERR["MAP" + str(map_num)]
             robot_err = ROBOT_ERR["MAP" + str(map_num)]
             # slippery_region = SLIPPERY["MAP" + str(round + 1)]
             env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[6],
+                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
                                 true_human_capability=true_capability,
                                 true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
                                 human_type=human_type, update_belief=update_belief)
@@ -351,7 +353,7 @@ if __name__ == '__main__':
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[6],
+            simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
                                              true_capability=true_capability,
                                              type="epsilon_greedy")  # This does not change
 
@@ -369,16 +371,16 @@ if __name__ == '__main__':
                 rewards.append(env_reward)
                 total_env_reward += env_reward
 
-                print("===================================================================================================")
-                print("===================================================================================================")
-                print("Average environmental reward after {} rounds:{}".format(num_rounds,
-                                                                               total_env_reward / float(num_rounds)))
-                print("Num Particles: ", len(driver.solver.root_action_node.belief))
+                # print("===================================================================================================")
+                # print("===================================================================================================")
+                # print("Average environmental reward after {} rounds:{}".format(num_rounds,
+                #                                                                total_env_reward / float(num_rounds)))
+                # print("Num Particles: ", len(driver.solver.root_action_node.belief))
 
                 # To visualize the rollout...
 
                 history = []
-                print("Path: ", all_states)
+                # print("Path: ", all_states)
                 for t in range(len(human_actions)-1):
                     history.append({"human_action": list(human_actions[t]),
                                     "robot_action": list(robot_actions[t])})
@@ -386,14 +388,14 @@ if __name__ == '__main__':
                 # user_data["mapOrder"] = [map_num]
                 user_data[str(SEED)] = {"history": history,
                                         "reward": rewards,
-                                        "true_trust": true_trust[6]}
+                                        "true_trust": true_trust[n]}
 
 
             # view_rollout(user_data, rollout_idx=0)
 
 
             all_rewards.append(rewards)
-            mean_rewards.append(np.mean(rewards))
+            mean_rewards.append(np.mean(rewards, dtype=np.int64))
             std_rewards.append(np.std(rewards))
 
         print("===================================================================================================")
@@ -405,9 +407,9 @@ if __name__ == '__main__':
         all_rewards = np.array(all_rewards)
         # with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
         #     np.save(f, all_rewards)
-
-    if update_belief:
-        write_json(f"logs/sim_experiments/map_{map_num}/ba_pomcp.json", user_data)
-    else:
-        write_json(f"logs/sim_experiments/map_{map_num}/pomcp_2.json", user_data)
+    #
+    # if update_belief:
+    #     write_json(f"logs/sim_experiments/map_{map_num}/ba_pomcp.json", user_data)
+    # else:
+    #     write_json(f"logs/sim_experiments/map_{map_num}/pomcp_2.json", user_data)
 
