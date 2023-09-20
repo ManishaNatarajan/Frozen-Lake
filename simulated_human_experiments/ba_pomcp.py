@@ -285,7 +285,7 @@ if __name__ == '__main__':
     true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
 
     # Initialize constants for setting up the environment
-    max_steps = 80
+    max_steps = 100
     num_choices = 3
 
     # The following two parameters are for human behavior. They are currently not used.
@@ -297,9 +297,9 @@ if __name__ == '__main__':
     c = 20  # 400  # exploration constant for UCT (taken as R_high - R_low)
     e = 0.1  # For epsilon-greedy policy
     epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
-    num_iter = 100
+    num_iter = 500
     num_steps = max_steps
-    update_belief = False  # set to true for BA-POMCP otherwise it's just regular POMCP
+    update_belief = True  # set to true for BA-POMCP otherwise it's just regular POMCP
     human_type = "epsilon_greedy" if update_belief else "random"
 
     # Executes num_tests of experiments
@@ -327,7 +327,7 @@ if __name__ == '__main__':
                 all_initial_belief_trust.append((1, 1))
 
             # Setup Driver
-            map_num = 12
+            map_num = 11
             map = MAPS["MAP" + str(map_num)]
             foggy = FOG["MAP" + str(map_num)]
             human_err = HUMAN_ERR["MAP" + str(map_num)]
@@ -353,11 +353,8 @@ if __name__ == '__main__':
 
             root_node = RootNode(env, initial_belief)
             solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
-            simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
-                                             true_capability=true_capability,
-                                             type="epsilon_greedy")  # This does not change
 
-            driver = Driver(env, solver, num_steps, simulated_human, update_belief=update_belief)
+
 
             # Executes num_rounds of search (calibration)
             num_rounds = 1
@@ -365,6 +362,12 @@ if __name__ == '__main__':
 
             rewards = []
             for i in range(num_rounds):
+                simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
+                                                 true_capability=true_capability,
+                                                 type="epsilon_greedy")  # This does not change
+
+                driver = Driver(env, solver, num_steps, simulated_human, update_belief=update_belief)
+
                 # We should only change the true state of the tiger for every round (or after every termination)
                 driver.env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
                 env_reward, human_actions, robot_actions, all_states = driver.execute(i, debug_tree=False)

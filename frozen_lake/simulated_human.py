@@ -239,30 +239,35 @@ class SimulatedHuman:
                 else:
                     curr_row = s // self.env.ncol
                     curr_col = s % self.env.ncol
-                    while s in self.detected_grids or s in self.recent_visited_grids\
-                            or self.env.desc[curr_row][curr_col] == b'H'\
-                            or self.env.desc[curr_row][curr_col] == b'G':
-                        if human_choice in actions:
-                            actions.remove(human_choice)
-                        if len(actions) == 0:
-                            # Need to check still if this action is not leading to a hole...
-                            while self.env.desc[curr_row][curr_col] == b'H':
-                                human_choice = np.random.choice(np.arange(4))
-                                s = self.env.move(current_position, human_choice)
-                                curr_row = s // self.env.ncol
-                                curr_col = s % self.env.ncol
-                            accept = 0 if robot_assist_type == 0 else 2
-                            detect = 0  # Do not detect as there's no feasible direction
-                            break
-                        human_choice = np.random.choice(actions)
-                        s = self.env.move(current_position, human_choice)
-                        curr_row = s // self.env.ncol
-                        curr_col = s % self.env.ncol
-
+                    if s in self.detected_grids or s in self.recent_visited_grids:
+                        # Do not detect (since we recently detected or visited and know it to be safe)
+                        # Just move
+                        accept = 0 if robot_assist_type == 0 else 2
+                        detect = 0
+            #     #     while s in self.detected_grids or s in self.recent_visited_grids\
+            #     #             or self.env.desc[curr_row][curr_col] == b'H'\
+            #     #             or self.env.desc[curr_row][curr_col] == b'G':
+            #     #         if human_choice in actions:
+            #     #             actions.remove(human_choice)
+            #     #         if len(actions) == 0:
+            #     #             # Need to check still if this action is not leading to a hole...
+            #     #             while self.env.desc[curr_row][curr_col] == b'H':
+            #     #                 human_choice = np.random.choice(np.arange(4))
+            #     #                 s = self.env.move(current_position, human_choice)
+            #     #                 curr_row = s // self.env.ncol
+            #     #                 curr_col = s % self.env.ncol
+            #     #             accept = 0 if robot_assist_type == 0 else 2
+            #     #             detect = 0  # Do not detect as there's no feasible direction
+            #     #             break
+            #     #         human_choice = np.random.choice(actions)
+            #     #         s = self.env.move(current_position, human_choice)
+            #     #         curr_row = s // self.env.ncol
+            #     #         curr_col = s % self.env.ncol
+            # #
                 if detect == 1 and s not in self.detected_grids:  # Need to check again after exiting the while loop
                     self.detected_grids.append(s)
-
-            else:
+            #
+            if detect != 1:
                 s = self.env.move(current_position, human_choice)
                 while len(self.recent_visited_grids) >= self.memory_len:
                     self.recent_visited_grids.pop(0)  # Remove the oldest grid visited
