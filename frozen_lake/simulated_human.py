@@ -74,6 +74,8 @@ class SimulatedHuman:
         detect = 0
         detect_new_grid_prob = 0.2
         if self.type == "random":
+            # Sample random acceptance probability
+            human_acceptance_probability = np.random.uniform()
             if robot_assist_type == 0:
                 # No assistance
                 # human_choice = np.random.choice(4)
