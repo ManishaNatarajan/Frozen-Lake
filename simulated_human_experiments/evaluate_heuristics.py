@@ -142,6 +142,24 @@ def execute(round_num, num_steps, env, human_agent, robot_agent=None):
 
 
 if __name__ == '__main__':
+    # Initialize constants for setting up the environment
+    max_steps = 100
+    num_choices = 3
+
+    # Human latent parameters (set different values for each test)
+    true_trust = [(20, 80), (40, 60), (60, 40), (80, 20), (99, 1)]
+    # true_trust = [(5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50)]
+    true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
+    # true_aggressiveness = (25, 25)
+
+    # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
+    gamma = 0.99
+    c = 10  # Exploration bonus
+    beta = 0.9
+
+    # Executes num_tests of experiments
+    num_test = 5
+
     # Set appropriate seeds
     for SEED in [0]:
         print("*********************************************************************")
@@ -151,26 +169,9 @@ if __name__ == '__main__':
         np.random.seed(SEED)
         os.environ['PYTHONHASHSEED'] = str(SEED)
 
-        # Initialize constants for setting up the environment
-        max_steps = 100
-        num_choices = 3
-
-        # Human latent parameters (set different values for each test)
-        true_trust = [(5, 50), (10, 40), (24, 36), (40, 45), (45, 20), (99, 1)]
-        # true_trust = [(5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50), (5, 50)]
-        true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
-        # true_aggressiveness = (25, 25)
-
-        # Executes num_tests of experiments
-        num_test = 6
         mean_rewards = []
         std_rewards = []
         all_rewards = []
-
-        # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
-        gamma = 0.99
-        c = 10  # Exploration bonus
-        beta = 0.9
 
         for n in range(num_test):
             # print("*********************************************************************")

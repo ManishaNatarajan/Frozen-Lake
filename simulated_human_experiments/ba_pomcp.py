@@ -274,13 +274,13 @@ class Driver:
 
 
 if __name__ == '__main__':
-    # Set appropriate seeds
-    seeds = [0, 5, 21, 25, 42]
+
+    seeds = [2, 3, 4]
+    # To visualize rollout:
     user_data = defaultdict(lambda: defaultdict())
-    # user_data["seed"] = seeds
 
     # Human latent parameters (set different values for each test)
-    true_trust = [(5, 50), (10, 40), (24, 36), (40, 45), (45, 20), (99, 1)]
+    true_trust = [(20, 80), (40, 60), (60, 40), (80, 20), (99, 1)]
     # true_trust = [(99, 1)]
     true_capability = 0.85  # fixed - parameter (assume known??) at the start of the study
 
@@ -288,14 +288,11 @@ if __name__ == '__main__':
     max_steps = 100
     num_choices = 3
 
-    # The following two parameters are for human behavior. They are currently not used.
-    human_behavior = "rational"  # TODO: they use this in the observation function in the environment
-    beta = 0.9  # Boltzmann rationality parameter (for human behavior)
-
-    # factors for POMCP
+    # factors for POMCP (also used in the environment for get_observations which uses UCT for human policy)
     gamma = 0.99  # gamma for terminating rollout based on depth in MCTS
     c = 20  # 400  # exploration constant for UCT (taken as R_high - R_low)
     e = 0.1  # For epsilon-greedy policy
+    beta = 0.9
     epsilon = math.pow(gamma, 30)  # tolerance factor to terminate rollout
     num_iter = 500
     num_steps = max_steps
@@ -303,116 +300,134 @@ if __name__ == '__main__':
     human_type = "epsilon_greedy" if update_belief else "random"
 
     # Executes num_tests of experiments
-    num_test = 6
+    num_test = 5
 
-    for n in range(num_test):
+    for map_num in [4, 5, 7, 10, 11, 12]:
         print("*********************************************************************")
-        print(f"Executing test number {n}, Trust:{true_trust[n]}......")
+        print("Executing MAP {}......".format(map_num))
         print("*********************************************************************")
 
-        mean_rewards = []
-        std_rewards = []
-        all_rewards = []
-
-        for SEED in [0, 5, 21, 25, 42]:  # [0, 5, 21, 25, 42]
+        for SEED in seeds:  # [0, 5, 21, 25, 42]
+            print("*********************************************************************")
+            print("Executing SEED {}......".format(SEED))
+            print("*********************************************************************")
             random.seed(SEED)
             np.random.seed(SEED)
             os.environ['PYTHONHASHSEED'] = str(SEED)
 
-            initial_belief = []
+            mean_rewards = []
+            std_rewards = []
+            all_rewards = []
 
-            # Robot's belief of human parameters
-            all_initial_belief_trust = []
-            for _ in range(1000):
-                all_initial_belief_trust.append((1, 1))
+            for n in range(num_test):
+                # print("*********************************************************************")
+                # print(f"Executing test number {n}, Trust:{true_trust[n]}......")
+                # print("*********************************************************************")
 
-            # Setup Driver
-            map_num = 11
-            map = MAPS["MAP" + str(map_num)]
-            foggy = FOG["MAP" + str(map_num)]
-            human_err = HUMAN_ERR["MAP" + str(map_num)]
-            robot_err = ROBOT_ERR["MAP" + str(map_num)]
-            # slippery_region = SLIPPERY["MAP" + str(round + 1)]
-            env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
-                                is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
-                                true_human_capability=true_capability,
-                                true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
-                                human_type=human_type, update_belief=update_belief)
+                # Robot's belief of human parameters
+                all_initial_belief_trust = []
+                for _ in range(1000):
+                    all_initial_belief_trust.append((1, 1))
 
-            # Reset the environment to initialize everything correctly
-            env.reset()
-            init_world_state = env.world_state
+                # Setup Driver
+                # map_num = 4
+                map = MAPS["MAP" + str(map_num)]
+                foggy = FOG["MAP" + str(map_num)]
+                human_err = HUMAN_ERR["MAP" + str(map_num)]
+                robot_err = ROBOT_ERR["MAP" + str(map_num)]
+                # slippery_region = SLIPPERY["MAP" + str(round + 1)]
+                env = FrozenLakeEnv(desc=map, foggy=foggy, human_err=human_err, robot_err=robot_err,
+                                    is_slippery=False, render_mode="human", true_human_trust=true_trust[n],
+                                    true_human_capability=true_capability,
+                                    true_robot_capability=0.85, beta=beta, c=c, gamma=gamma, seed=SEED,
+                                    human_type=human_type, update_belief=update_belief)
 
-            # TODO: Initialize belief: Currently only using the 4 combinations
-            for i in range(len(all_initial_belief_trust)):
-                initial_belief.append(
-                    [init_world_state[0], init_world_state[1], init_world_state[2], init_world_state[3],
-                     init_world_state[4], init_world_state[5],
-                     list(all_initial_belief_trust[i]),
-                     true_capability])
+                # Executes num_rounds of search (calibration)
+                num_rounds = 1
+                total_env_reward = 0
 
-            root_node = RootNode(env, initial_belief)
-            solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
+                rewards = []
+                for i in range(num_rounds):
+                    # Re-initialize the human model and belief for each round...
+                    initial_belief = []
+
+                    # Reset the environment to initialize everything correctly
+                    env.reset()
+                    init_world_state = env.world_state
+
+                    # TODO: Diversify Initial belief
+                    for b in range(len(all_initial_belief_trust)):
+                        initial_belief.append(
+                            [init_world_state[0], init_world_state[1], init_world_state[2], init_world_state[3],
+                             init_world_state[4], init_world_state[5],
+                             list(all_initial_belief_trust[b]),
+                             true_capability])
+
+                    root_node = RootNode(env, initial_belief)
+                    solver = POMCPSolver(epsilon, env, root_node, num_iter, c)
+
+                    simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
+                                                     true_capability=true_capability,
+                                                     type="epsilon_greedy")  # This does not change
+
+                    driver = Driver(env, solver, num_steps, simulated_human, update_belief=update_belief)
+
+                    # We should only change the true state of the tiger for every round (or after every termination)
+                    driver.env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
+                    env_reward, human_actions, robot_actions, all_states = driver.execute(i, debug_tree=False)
+                    print(env_reward)
+                    rewards.append(env_reward)
+                    total_env_reward += env_reward
+
+                    # print("===================================================================================================")
+                    # print("===================================================================================================")
+                    # print("Average environmental reward after {} rounds:{}".format(num_rounds,
+                    #                                                                total_env_reward / float(num_rounds)))
+                    # print("Num Particles: ", len(driver.solver.root_action_node.belief))
+
+                    # To visualize the rollout...
+
+                    history = []
+                    # print("Path: ", all_states)
+                    for t in range(len(human_actions)-1):
+                        history.append({"human_action": list(human_actions[t]),
+                                        "robot_action": list(robot_actions[t])})
+
+                    # user_data["mapOrder"] = [map_num]
+                    # user_data[str(SEED)] = {"history": history,
+                    #                         "reward": rewards,
+                    #                         "true_trust": true_trust[n]}
 
 
-
-            # Executes num_rounds of search (calibration)
-            num_rounds = 1
-            total_env_reward = 0
-
-            rewards = []
-            for i in range(num_rounds):
-                simulated_human = SimulatedHuman(env, true_trust=true_trust[n],
-                                                 true_capability=true_capability,
-                                                 type="epsilon_greedy")  # This does not change
-
-                driver = Driver(env, solver, num_steps, simulated_human, update_belief=update_belief)
-
-                # We should only change the true state of the tiger for every round (or after every termination)
-                driver.env.reset()  # Note tiger_idx can be either 0 or 1 indicating left or right door
-                env_reward, human_actions, robot_actions, all_states = driver.execute(i, debug_tree=False)
-                rewards.append(env_reward)
-                total_env_reward += env_reward
-
-                # print("===================================================================================================")
-                # print("===================================================================================================")
-                # print("Average environmental reward after {} rounds:{}".format(num_rounds,
-                #                                                                total_env_reward / float(num_rounds)))
-                # print("Num Particles: ", len(driver.solver.root_action_node.belief))
-
-                # To visualize the rollout...
-
-                history = []
-                # print("Path: ", all_states)
-                for t in range(len(human_actions)-1):
-                    history.append({"human_action": list(human_actions[t]),
-                                    "robot_action": list(robot_actions[t])})
-
-                # user_data["mapOrder"] = [map_num]
-                user_data[str(SEED)] = {"history": history,
-                                        "reward": rewards,
-                                        "true_trust": true_trust[n]}
+                # view_rollout(user_data, rollout_idx=0)
 
 
-            # view_rollout(user_data, rollout_idx=0)
+                all_rewards.append(rewards)
+                mean_rewards.append(np.mean(rewards, dtype=np.int64))
+                std_rewards.append(np.std(rewards))
 
+            print("===================================================================================================")
+            print("===================================================================================================")
+            print(mean_rewards, std_rewards)
+            print("===================================================================================================")
+            print("===================================================================================================")
 
-            all_rewards.append(rewards)
-            mean_rewards.append(np.mean(rewards, dtype=np.int64))
-            std_rewards.append(np.std(rewards))
+            all_rewards = np.array(all_rewards)
+            print(all_rewards)
+            # with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
+            #     np.save(f, all_rewards)
+        #
+        # if update_belief:
+        #     write_json(f"logs/sim_experiments/map_{map_num}/ba_pomcp.json", user_data)
+        # else:
+        #     write_json(f"logs/sim_experiments/map_{map_num}/pomcp_2.json", user_data)
 
-        print("===================================================================================================")
-        print("===================================================================================================")
-        print(mean_rewards, std_rewards)
-        print("===================================================================================================")
-        print("===================================================================================================")
+            # Combine the arrays horizontally to create a 2D array
+            combined_array = np.column_stack((mean_rewards, std_rewards))
 
-        all_rewards = np.array(all_rewards)
-        # with open("files/pomcp_test/map{}_iter{}_{}.npy".format(map_num, num_iter, SEED), 'wb') as f:
-        #     np.save(f, all_rewards)
-    #
-    # if update_belief:
-    #     write_json(f"logs/sim_experiments/map_{map_num}/ba_pomcp.json", user_data)
-    # else:
-    #     write_json(f"logs/sim_experiments/map_{map_num}/pomcp_2.json", user_data)
+            # Specify the CSV file path
+            csv_file_path = f'frozen_lake/files/ba_pomcp_test/output_MAP_{map_num}_SEED_{SEED}_500.csv'
+
+            # Save the 2D array as a CSV file
+            np.savetxt(csv_file_path, combined_array, delimiter=',', fmt='%.3f')
 
